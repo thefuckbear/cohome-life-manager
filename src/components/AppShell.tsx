@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { PLACEHOLDER_EVENT, triggerPlaceholder } from '../lib/placeholder'
+import { PLACEHOLDER_EVENT, triggerPlaceholder, type AppNotice } from '../lib/placeholder'
 
 const navigation = [
   { to: '/', label: '今日首页', icon: Home },
@@ -36,15 +36,15 @@ function Brand() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<AppNotice | null>(null)
 
   useEffect(() => {
     let timer = 0
     const handlePlaceholder = (event: Event) => {
-      const customEvent = event as CustomEvent<{ message: string }>
-      setToast(customEvent.detail.message)
+      const customEvent = event as CustomEvent<AppNotice>
       window.clearTimeout(timer)
-      timer = window.setTimeout(() => setToast(''), 2400)
+      setToast(customEvent.detail)
+      timer = window.setTimeout(() => setToast(null), 2400)
     }
     window.addEventListener(PLACEHOLDER_EVENT, handlePlaceholder)
     return () => {
@@ -110,8 +110,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {toast && (
         <div className="toast" role="status">
           <span className="toast__icon"><Sparkles size={17} /></span>
-          <div><strong>接口已预留</strong><span>{toast}，后续可接入真实逻辑</span></div>
-          <button aria-label="关闭提示" onClick={() => setToast('')}><X size={16} /></button>
+          <div><strong>{toast.title}</strong><span>{toast.message}</span></div>
+          <button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button>
         </div>
       )}
     </div>

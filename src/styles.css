@@ -83,6 +83,7 @@ h1, h2, h3, p { margin: 0; }
 .button:hover { transform: translateY(-1px); }
 .button--primary { color: white; background: var(--green); box-shadow: 0 7px 16px rgba(66, 108, 88, .16); }
 .button--primary:hover { background: var(--green-dark); }
+.button:disabled { cursor: default; opacity: .62; transform: none; box-shadow: none; }
 .button--secondary { color: #57635c; border-color: #e1e2da; background: white; }
 .button--secondary:hover { border-color: #bfcfc5; }
 .button--ghost { min-height: 32px; padding: 0 8px; color: var(--green); background: transparent; }
@@ -262,6 +263,8 @@ h1, h2, h3, p { margin: 0; }
   .mobile-nav__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #8a928d; border-radius: 13px; text-decoration: none; font-size: 8px; font-weight: 700; }
   .mobile-nav__item.is-active { color: var(--green); background: var(--green-soft); }
   .toast { bottom: 88px; }
+  .button { min-height: 44px; }
+  .icon-button { width: 44px; height: 44px; }
   .schedule-summary { grid-template-columns: 1fr auto; }
   .progress-copy { display: none; }
 }
