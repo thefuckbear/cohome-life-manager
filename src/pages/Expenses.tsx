@@ -12,6 +12,7 @@ import {
 import { Modal } from '../components/Modal'
 import { PlaceholderButton } from '../components/PlaceholderButton'
 import {
+  computeSettlements,
   dateKey,
   expenseStatus,
   expenseTotal,
@@ -266,6 +267,7 @@ export function Expenses() {
   const payable = payableFor(store, selfId)
   const receivable = receivableFor(store, selfId)
   const total = expenseTotal(store)
+  const settlements = computeSettlements(store)
   const bills = [...store.expenses].sort((a, b) => (a.date < b.date ? 1 : -1))
 
   const handleSettleAll = () => {
@@ -286,6 +288,31 @@ export function Expenses() {
         <article className="metric-card"><span className="metric-icon metric-icon--green"><ArrowDownLeft size={20} /></span><div><small>我将收到</small><strong>¥{yuan(receivable.total)}</strong><span>来自室友的待结算</span></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon--purple"><CircleDollarSign size={20} /></span><div><small>共同支出总额</small><strong>¥{yuan(total)}</strong><span>已记录 {store.expenses.length} 笔费用</span></div></article>
       </section>
+
+      {settlements.length > 0 && (
+        <section className="panel module-panel">
+          <div className="panel__header">
+            <div><h2>结算方案</h2><p>按下面转账，账就平了</p></div>
+            <span className="tag tag--warm">{settlements.length} 笔转账</span>
+          </div>
+          <div className="settlement-list">
+            {settlements.map((s) => {
+              const from = getMember(store, s.from)
+              const to = getMember(store, s.to)
+              return (
+                <div className="settlement-row" key={`${s.from}-${s.to}`}>
+                  <span className="avatar avatar--sm" style={{ background: from?.color }}>{from?.initials}</span>
+                  <strong>{from?.name}</strong>
+                  <span className="settlement-arrow">转给</span>
+                  <span className="avatar avatar--sm" style={{ background: to?.color }}>{to?.initials}</span>
+                  <strong>{to?.name}</strong>
+                  <span className="settlement-amount">¥{yuan(s.amount)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="panel module-panel">
         <div className="panel__header">

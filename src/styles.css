@@ -181,6 +181,13 @@ h1, h2, h3, p { margin: 0; }
 .empty-preview strong { font-size: 11px; }
 .empty-preview span { margin-top: 3px; color: #7f8a83; font-size: 9px; }
 
+.settlement-list { margin-top: 14px; }
+.settlement-row { min-height: 48px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #efeee8; }
+.settlement-row:first-child { border-top: 0; }
+.settlement-row strong { font-size: 11px; }
+.settlement-arrow { color: #a1a7a3; font-size: 9px; }
+.settlement-amount { margin-left: auto; font-size: 12px; font-weight: 800; color: #2a3831; }
+
 .schedule-summary { margin-bottom: 16px; padding: 18px 20px; display: grid; grid-template-columns: minmax(210px, 1fr) minmax(170px, .7fr) auto; align-items: center; gap: 24px; border-radius: 16px; color: white; background: linear-gradient(115deg, #3f6b57, #60836f); box-shadow: 0 12px 26px rgba(58, 93, 75, .16); }
 .schedule-summary > div:first-child { display: flex; align-items: center; gap: 12px; }
 .schedule-icon { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.14); }

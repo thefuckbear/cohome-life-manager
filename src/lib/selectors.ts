@@ -86,6 +86,36 @@ export function computeNetBalances(state: AppData): Record<ID, Money> {
   return net
 }
 
+export interface Settlement {
+  from: ID
+  to: ID
+  amount: Money
+}
+
+export function computeSettlements(state: AppData): Settlement[] {
+  const net = computeNetBalances(state)
+  const creditors: { id: ID; amount: Money }[] = []
+  const debtors: { id: ID; amount: Money }[] = []
+  for (const [id, value] of Object.entries(net)) {
+    if (value > 0) creditors.push({ id, amount: value })
+    else if (value < 0) debtors.push({ id, amount: -value })
+  }
+  creditors.sort((a, b) => b.amount - a.amount)
+  debtors.sort((a, b) => b.amount - a.amount)
+  const result: Settlement[] = []
+  let i = 0
+  let j = 0
+  while (i < debtors.length && j < creditors.length) {
+    const amount = Math.min(debtors[i].amount, creditors[j].amount)
+    result.push({ from: debtors[i].id, to: creditors[j].id, amount })
+    debtors[i].amount -= amount
+    creditors[j].amount -= amount
+    if (debtors[i].amount === 0) i += 1
+    if (creditors[j].amount === 0) j += 1
+  }
+  return result
+}
+
 export interface PendingShare {
   share: ExpenseShare
   expense: Expense
