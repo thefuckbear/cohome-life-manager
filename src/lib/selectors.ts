@@ -148,6 +148,27 @@ export function myChoreThisWeek(state: AppData, memberId: ID): ChoreTask | undef
   )
 }
 
+export function myChoreToday(state: AppData, memberId: ID): ChoreTask | undefined {
+  const now = new Date()
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(now)
+  end.setHours(23, 59, 59, 999)
+  return state.choreTasks.find((c) => {
+    if (c.assigneeId !== memberId || c.status !== 'pending') return false
+    const due = new Date(c.dueAt).getTime()
+    return due >= start.getTime() && due <= end.getTime()
+  })
+}
+
+export type ReminderStage = 'start' | 'due-soon'
+
+export function choreReminderStage(task: ChoreTask, now = new Date()): ReminderStage {
+  const due = new Date(task.dueAt).getTime()
+  const twoHoursBefore = due - 2 * 3_600_000
+  return now.getTime() >= twoHoursBefore ? 'due-soon' : 'start'
+}
+
 export function choresThisWeek(state: AppData): ChoreTask[] {
   const weekOf = dateKey(currentMonday())
   return state.choreTasks.filter((c) => c.weekOf === weekOf)
@@ -178,13 +199,13 @@ export function formatDue(dueAt: string): string {
 }
 
 export function daysUntilRestock(supply: Supply, now = new Date()): number {
-  if (!supply.lastBoughtAt) return -1
+  if (!supply.lastBoughtAt || !supply.cycleDays) return -1
   const due = new Date(supply.lastBoughtAt).getTime() + supply.cycleDays * 86_400_000
   return Math.ceil((due - now.getTime()) / 86_400_000)
 }
 
 export function nextBuyerFor(state: AppData, supply: Supply): Member | undefined {
-  const order = supply.rotateOrder.length ? supply.rotateOrder : state.members.map((m) => m.id)
+  const order = supply.rotateOrder?.length ? supply.rotateOrder : state.members.map((m) => m.id)
   const idx = order.indexOf(supply.lastBuyerId ?? '')
   const nextId = order[(idx + 1) % order.length]
   return getMember(state, nextId)

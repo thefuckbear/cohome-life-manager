@@ -193,6 +193,12 @@ h1, h2, h3, p { margin: 0; }
 .chore-reminder strong, .chore-reminder span { display: block; }
 .chore-reminder strong { font-size: 12px; color: #7c4a22; }
 .chore-reminder span { margin-top: 3px; font-size: 10px; color: #9a6a3f; }
+.chore-reminder.is-due-soon { background: linear-gradient(120deg, #fde7dd, #f8d3c4); border-color: #f0c4ae; }
+.chore-reminder.is-due-soon .chore-reminder__icon { color: #c2543a; }
+.chore-reminder.is-due-soon strong { color: #a5442c; }
+.chore-reminder--team { background: linear-gradient(120deg, #eef4f0, #e3ece6); border-color: #d3e0d8; }
+.chore-reminder--team .chore-reminder__icon { color: var(--green); }
+.chore-reminder--team strong { color: #315445; }
 
 .schedule-summary { margin-bottom: 16px; padding: 18px 20px; display: grid; grid-template-columns: minmax(210px, 1fr) minmax(170px, .7fr) auto; align-items: center; gap: 24px; border-radius: 16px; color: white; background: linear-gradient(115deg, #3f6b57, #60836f); box-shadow: 0 12px 26px rgba(58, 93, 75, .16); }
 .schedule-summary > div:first-child { display: flex; align-items: center; gap: 12px; }

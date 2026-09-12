@@ -1,12 +1,15 @@
-import { useState } from 'react'
-import { BellRing, CalendarDays, Check, Clock3, Plus, RefreshCw, Repeat2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BellRing, CalendarDays, Check, Clock3, Plus, RefreshCw, Repeat2, UserPlus } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
 import {
   choresDoneCount,
   choresThisWeek,
+  choreReminderStage,
   formatDue,
   getMember,
+  getSelf,
+  myChoreToday,
   nextWeekGenerated,
   weekRangeLabel,
 } from '../lib/selectors'
@@ -19,6 +22,8 @@ const CHORE_AREAS: { area: ChoreArea; label: string; emoji: string }[] = [
   { area: 'bathroom', label: '卫生间', emoji: '🚿' },
   { area: 'trash', label: '垃圾', emoji: '🗑️' },
 ]
+
+const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 function todayKey() {
   const n = new Date()
@@ -104,10 +109,63 @@ function SetupPlanModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function AssignModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const [area, setArea] = useState<ChoreArea>('kitchen')
+  const [memberId, setMemberId] = useState<ID>(store.members[0]?.id ?? '')
+  const [dayOffset, setDayOffset] = useState(0)
+
+  const submit = () => {
+    store.assignChoreTask(area, memberId, dayOffset)
+    const member = getMember(store, memberId)
+    notify(`已安排 ${member?.name} 在${WEEKDAYS[dayOffset]}负责${CHORE_AREAS.find((a) => a.area === area)?.label}`)
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <span className="form-label">选择值日任务</span>
+      <div className="participant-list">
+        {CHORE_AREAS.map(({ area: a, label, emoji }) => (
+          <label key={a} className="participant-item">
+            <input type="radio" name="assign-area" checked={area === a} onChange={() => setArea(a)} />
+            <span>{emoji} {label}</span>
+          </label>
+        ))}
+      </div>
+      <span className="form-label">指派给哪位室友</span>
+      <div className="participant-list">
+        {store.members.map((m) => (
+          <label key={m.id} className="participant-item">
+            <input type="radio" name="assign-member" checked={memberId === m.id} onChange={() => setMemberId(m.id)} />
+            <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
+            <span>{m.name}{m.isSelf ? '（我）' : ''}</span>
+          </label>
+        ))}
+      </div>
+      <span className="form-label">在周几值日</span>
+      <div className="participant-list">
+        {WEEKDAYS.map((d, i) => (
+          <label key={d} className="participant-item">
+            <input type="radio" name="assign-day" checked={dayOffset === i} onChange={() => setDayOffset(i)} />
+            <span>{d}</span>
+          </label>
+        ))}
+      </div>
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><UserPlus size={15} /> 指定值日</button>
+      </div>
+    </div>
+  )
+}
+
 export function Chores() {
   const store = useStore()
+  const self = getSelf(store)
   const [swapTask, setSwapTask] = useState<ChoreTask | null>(null)
   const [showSetup, setShowSetup] = useState(false)
+  const [showAssign, setShowAssign] = useState(false)
 
   const tasks = choresThisWeek(store)
   const done = choresDoneCount(store)
@@ -119,6 +177,23 @@ export function Chores() {
   const dueToday = tasks.filter((t) => t.status === 'pending' && (t.date === today || isOverdue(t)))
   const overdueCount = tasks.filter((t) => isOverdue(t)).length
 
+  const myToday = self ? myChoreToday(store, self.id) : undefined
+  const myStage = myToday ? choreReminderStage(myToday) : null
+
+  useEffect(() => {
+    if (!self) return
+    const chore = myChoreToday(useStore.getState(), self.id)
+    if (!chore || !('Notification' in window)) return
+    if (Notification.permission === 'granted') {
+      const stage = choreReminderStage(chore)
+      const title = stage === 'due-soon' ? '值日临近截止' : '今日值日提醒'
+      const body = stage === 'due-soon' ? `今晚 20:00 前完成「${chore.title}」` : `今天轮到你值日「${chore.title}」`
+      new Notification(title, { body })
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [self])
+
   const handleGenerate = () => {
     if (nextGenerated) return
     store.generateNextWeek()
@@ -128,11 +203,24 @@ export function Chores() {
     <div className="page module-page">
       <section className="module-heading">
         <div><span className="eyebrow">轮流分担，不靠催促</span><h1>清洁值日</h1><p>填人 + 点选任务，自动生成公平排班，到期自动提醒。</p></div>
-        <button className="button button--primary" type="button" onClick={() => setShowSetup(true)}><Plus size={17} /> 重新安排排班</button>
+        <div className="header-actions">
+          <button className="button button--secondary" type="button" onClick={() => setShowAssign(true)}><UserPlus size={16} /> 指定值日</button>
+          <button className="button button--primary" type="button" onClick={() => setShowSetup(true)}><Plus size={17} /> 重新安排排班</button>
+        </div>
       </section>
 
+      {myToday && (
+        <section className={`chore-reminder ${myStage === 'due-soon' ? 'is-due-soon' : ''}`}>
+          <span className="chore-reminder__icon"><BellRing size={20} /></span>
+          <div>
+            <strong>{myStage === 'due-soon' ? '值日临近截止' : '今日轮到你值日'}</strong>
+            <span>{myStage === 'due-soon' ? `今晚 20:00 前记得完成「${myToday.title}」` : `今天轮到你负责「${myToday.title}」，记得完成`}</span>
+          </div>
+        </section>
+      )}
+
       {dueToday.length > 0 && (
-        <section className="chore-reminder">
+        <section className="chore-reminder chore-reminder--team">
           <span className="chore-reminder__icon"><BellRing size={20} /></span>
           <div>
             <strong>今日值班提醒</strong>
@@ -188,6 +276,7 @@ export function Chores() {
 
       {swapTask && <SwapModal task={swapTask} onClose={() => setSwapTask(null)} />}
       {showSetup && <Modal title="自动排班" onClose={() => setShowSetup(false)}><SetupPlanModal onClose={() => setShowSetup(false)} /></Modal>}
+      {showAssign && <Modal title="指定值日" onClose={() => setShowAssign(false)}><AssignModal onClose={() => setShowAssign(false)} /></Modal>}
     </div>
   )
 }

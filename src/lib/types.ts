@@ -144,6 +144,7 @@ export type ActivityType =
   | 'supply_restocked'
   | 'agreement_voted'
   | 'agreement_reminded'
+  | 'agreement_proposed'
 
 export interface ActivityEvent {
   id: ID

@@ -26,6 +26,14 @@ const MEMBER_XIA = 'm-xia'
 
 const DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
+const AREA_LABEL: Record<ChoreArea, string> = {
+  kitchen: '厨房清洁',
+  living: '客厅清洁',
+  bathroom: '卫生间清洁',
+  trash: '垃圾清理',
+  custom: '公共区域清洁',
+}
+
 function startOfDay(date: Date) {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)
@@ -173,6 +181,9 @@ export interface AppState extends AppData {
   recordPurchase: (supplyId: ID, price: Money, asExpense: boolean) => void
   remindAgreement: (agreementId: ID, memberId: ID) => void
   setupChorePlan: (areas: ChoreArea[], memberIds: ID[]) => void
+  assignChoreTask: (area: ChoreArea, memberId: ID, dayOffset: number) => void
+  proposeAgreement: (title: string, content: string, category: string, icon: string) => void
+  voteAgreement: (agreementId: ID, agree: boolean) => void
   reset: () => void
 }
 
@@ -453,13 +464,6 @@ export const useStore = create<AppState>()(
           const thisWeek = dateKey(currentMonday())
           const now = new Date().toISOString()
           const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
-          const AREA_LABEL: Record<ChoreArea, string> = {
-            kitchen: '厨房清洁',
-            living: '客厅清洁',
-            bathroom: '卫生间清洁',
-            trash: '垃圾清理',
-            custom: '公共区域清洁',
-          }
           const AREA_DAY_OFFSET: Record<ChoreArea, number> = {
             kitchen: 0,
             living: 2,
@@ -498,10 +502,100 @@ export const useStore = create<AppState>()(
           return { choreTasks, activities: [activity, ...state.activities] }
         })
       },
+      assignChoreTask: (area, memberId, dayOffset) => {
+        set((state) => {
+          const member = state.members.find((m) => m.id === memberId)
+          if (!member) return {}
+          const thisWeek = dateKey(currentMonday())
+          const now = new Date().toISOString()
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const dueDate = addDaysLocal(currentMonday(), dayOffset)
+          dueDate.setHours(20, 0, 0, 0)
+          const task: ChoreTask = {
+            id: uid('c'),
+            houseId: state.house.id,
+            ruleId: state.choreRules.find((r) => r.area === area)?.id,
+            area,
+            title: AREA_LABEL[area],
+            assigneeId: memberId,
+            weekOf: thisWeek,
+            date: formatDate(dueDate),
+            dayLabel: DAYS[dueDate.getDay()],
+            dueAt: toISO(dueDate),
+            status: 'pending',
+          }
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'chore_rotated',
+            targetId: task.id,
+            summary: `安排${member.name}在${DAYS[dueDate.getDay()]}负责${AREA_LABEL[area]}`,
+            at: now,
+          }
+          return { choreTasks: [...state.choreTasks, task], activities: [activity, ...state.activities] }
+        })
+      },
+      proposeAgreement: (title, content, category, icon) => {
+        set((state) => {
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const now = new Date().toISOString()
+          const agreement: Agreement = {
+            id: uid('ag'),
+            houseId: state.house.id,
+            title,
+            content,
+            category,
+            status: 'voting',
+            version: 1,
+            createdBy: selfId,
+            createdAt: now,
+            icon,
+          }
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'agreement_proposed',
+            targetId: agreement.id,
+            summary: `发起了新公约「${title}」`,
+            at: now,
+          }
+          return { agreements: [...state.agreements, agreement], activities: [activity, ...state.activities] }
+        })
+      },
+      voteAgreement: (agreementId, agree) => {
+        set((state) => {
+          const agreement = state.agreements.find((a) => a.id === agreementId)
+          if (!agreement) return {}
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const now = new Date().toISOString()
+          const alreadyVoted = state.votes.some((v) => v.agreementId === agreementId && v.memberId === selfId)
+          const votes = alreadyVoted
+            ? state.votes.map((v) => (v.agreementId === agreementId && v.memberId === selfId ? { ...v, agree, votedAt: now } : v))
+            : [...state.votes, { id: uid('v'), agreementId, memberId: selfId, agree, votedAt: now }]
+          const agreeCount = votes.filter((v) => v.agreementId === agreementId && v.agree).length
+          const allAgreed = agreeCount >= state.members.length
+          const agreements = state.agreements.map((a) =>
+            a.id === agreementId ? { ...a, status: allAgreed ? ('active' as const) : a.status, effectiveAt: allAgreed ? now : a.effectiveAt } : a,
+          )
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'agreement_voted',
+            targetId: agreementId,
+            summary: allAgreed ? `「${agreement.title}」全员通过，已生效` : `${agree ? '同意' : '反对'}了「${agreement.title}」`,
+            at: now,
+          }
+          return { votes, agreements, activities: [activity, ...state.activities] }
+        })
+      },
       reset: () => set({ ...createSeedData() }),
     }),
     {
       name: 'cohome:store',
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         house: state.house,
