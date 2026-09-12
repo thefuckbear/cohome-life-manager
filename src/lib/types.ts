@@ -88,20 +88,17 @@ export interface ChoreTask {
   swappedFromId?: ID
 }
 
-export type StockLevel = 'enough' | 'low' | 'almost_out'
-
 export interface Supply {
   id: ID
   houseId: ID
   name: string
   emoji: string
   category: string
-  level: StockLevel
-  stockPct: number
+  cycleDays: number
   lastBuyerId?: ID
   lastBoughtAt?: string
   refPrice?: Money
-  restockOwnerId?: ID
+  rotateOrder: ID[]
 }
 
 export interface PurchaseLog {
@@ -146,6 +143,7 @@ export type ActivityType =
   | 'supply_low'
   | 'supply_restocked'
   | 'agreement_voted'
+  | 'agreement_reminded'
 
 export interface ActivityEvent {
   id: ID

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { CalendarDays, Check, Clock3, Plus, RefreshCw, Repeat2 } from 'lucide-react'
+import { BellRing, CalendarDays, Check, Clock3, Plus, RefreshCw, Repeat2 } from 'lucide-react'
 import { Modal } from '../components/Modal'
-import { PlaceholderButton } from '../components/PlaceholderButton'
+import { notify } from '../lib/placeholder'
 import {
   choresDoneCount,
   choresThisWeek,
@@ -11,7 +11,23 @@ import {
   weekRangeLabel,
 } from '../lib/selectors'
 import { useStore } from '../lib/store'
-import type { ChoreTask, ID } from '../lib/types'
+import type { ChoreArea, ChoreTask, ID } from '../lib/types'
+
+const CHORE_AREAS: { area: ChoreArea; label: string; emoji: string }[] = [
+  { area: 'kitchen', label: '厨房', emoji: '🍳' },
+  { area: 'living', label: '客厅', emoji: '🛋️' },
+  { area: 'bathroom', label: '卫生间', emoji: '🚿' },
+  { area: 'trash', label: '垃圾', emoji: '🗑️' },
+]
+
+function todayKey() {
+  const n = new Date()
+  return `${String(n.getMonth() + 1).padStart(2, '0')}/${String(n.getDate()).padStart(2, '0')}`
+}
+
+function isOverdue(task: ChoreTask) {
+  return task.status === 'pending' && new Date(task.dueAt).getTime() < Date.now()
+}
 
 function SwapModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) {
   const store = useStore()
@@ -40,15 +56,68 @@ function SwapModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) 
   )
 }
 
+function SetupPlanModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const [areas, setAreas] = useState<ChoreArea[]>(['kitchen', 'living', 'bathroom', 'trash'])
+  const [members, setMembers] = useState<ID[]>(store.members.map((m) => m.id))
+
+  const toggleArea = (a: ChoreArea) => {
+    setAreas((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]))
+  }
+  const toggleMember = (id: ID) => {
+    setMembers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const submit = () => {
+    store.setupChorePlan(areas, members)
+    notify('已自动生成本周值日排班')
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <span className="form-label">选择要做的值日任务（可多选）</span>
+      <div className="participant-list">
+        {CHORE_AREAS.map(({ area, label, emoji }) => (
+          <label key={area} className="participant-item">
+            <input type="checkbox" checked={areas.includes(area)} onChange={() => toggleArea(area)} />
+            <span>{emoji} {label}</span>
+          </label>
+        ))}
+      </div>
+      <span className="form-label">参加值日的室友（自动轮流分配）</span>
+      <div className="participant-list">
+        {store.members.map((m) => (
+          <label key={m.id} className="participant-item">
+            <input type="checkbox" checked={members.includes(m.id)} onChange={() => toggleMember(m.id)} />
+            <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
+            <span>{m.name}{m.isSelf ? '（我）' : ''}</span>
+          </label>
+        ))}
+      </div>
+      <p className="form-label" style={{ color: '#7f8a83' }}>将生成 {areas.length} 项任务，按顺序轮流分给 {members.length} 位室友。</p>
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" disabled={!areas.length || !members.length} onClick={submit}><CalendarDays size={15} /> 自动生成排班</button>
+      </div>
+    </div>
+  )
+}
+
 export function Chores() {
   const store = useStore()
   const [swapTask, setSwapTask] = useState<ChoreTask | null>(null)
+  const [showSetup, setShowSetup] = useState(false)
 
   const tasks = choresThisWeek(store)
   const done = choresDoneCount(store)
   const { weekNumber, label } = weekRangeLabel()
   const nextGenerated = nextWeekGenerated(store)
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0
+
+  const today = todayKey()
+  const dueToday = tasks.filter((t) => t.status === 'pending' && (t.date === today || isOverdue(t)))
+  const overdueCount = tasks.filter((t) => isOverdue(t)).length
 
   const handleGenerate = () => {
     if (nextGenerated) return
@@ -58,9 +127,19 @@ export function Chores() {
   return (
     <div className="page module-page">
       <section className="module-heading">
-        <div><span className="eyebrow">轮流分担，不靠催促</span><h1>清洁值日</h1><p>查看本周排班、完成任务，或和室友轻松换班。</p></div>
-        <PlaceholderButton feature="新建值日任务" variant="primary"><Plus size={17} /> 新建任务</PlaceholderButton>
+        <div><span className="eyebrow">轮流分担，不靠催促</span><h1>清洁值日</h1><p>填人 + 点选任务，自动生成公平排班，到期自动提醒。</p></div>
+        <button className="button button--primary" type="button" onClick={() => setShowSetup(true)}><Plus size={17} /> 重新安排排班</button>
       </section>
+
+      {dueToday.length > 0 && (
+        <section className="chore-reminder">
+          <span className="chore-reminder__icon"><BellRing size={20} /></span>
+          <div>
+            <strong>今日值班提醒</strong>
+            <span>{dueToday.map((t) => `${getMember(store, t.assigneeId)?.name}：${t.title}${isOverdue(t) ? '（已逾期）' : ''}`).join('　')}</span>
+          </div>
+        </section>
+      )}
 
       <section className="schedule-summary">
         <div>
@@ -68,7 +147,7 @@ export function Chores() {
           <div><small>第 {weekNumber} 周</small><strong>{label}</strong></div>
         </div>
         <div className="progress-copy">
-          <span><strong>{done}</strong> / {tasks.length} 已完成</span>
+          <span><strong>{done}</strong> / {tasks.length} 已完成{overdueCount > 0 ? ` · ${overdueCount} 项已逾期` : ''}</span>
           <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         </div>
         <button className="button button--secondary" type="button" disabled={nextGenerated} onClick={handleGenerate} style={nextGenerated ? { opacity: 0.6 } : undefined}>
@@ -78,13 +157,13 @@ export function Chores() {
 
       <section className="panel module-panel">
         <div className="panel__header">
-          <div><h2>本周排班</h2><p>按公共区域轮换安排</p></div>
-          <PlaceholderButton feature="排班规则设置" variant="ghost">管理轮换规则</PlaceholderButton>
+          <div><h2>本周排班</h2><p>按公共区域自动轮换，逾期会高亮提醒</p></div>
         </div>
         <div className="chore-grid">
           {tasks.map((item) => {
             const member = getMember(store, item.assigneeId)
             const isDone = item.status === 'done'
+            const overdue = isOverdue(item)
             return (
               <article className={`chore-card ${isDone ? 'is-done' : ''}`} key={item.id}>
                 <div className="chore-card__date"><strong>{item.dayLabel}</strong><span>{item.date}</span></div>
@@ -92,9 +171,9 @@ export function Chores() {
                   <span className="avatar" style={{ background: member?.color }}>{member?.initials}</span>
                   <div><small>{member?.name}{item.swappedFromId ? '（已换班）' : ''}负责</small><strong>{item.title}</strong></div>
                 </div>
-                <span className={`tag ${isDone ? 'tag--success' : 'tag--warm'}`}>{isDone && <Check size={13} />}{isDone ? '已完成' : `截止 ${formatDue(item.dueAt)}`}</span>
+                <span className={`tag ${isDone ? 'tag--success' : overdue ? 'tag--danger' : 'tag--warm'}`}>{isDone && <Check size={13} />}{isDone ? '已完成' : overdue ? '已逾期' : `截止 ${formatDue(item.dueAt)}`}</span>
                 {isDone ? (
-                  <PlaceholderButton feature={`${item.title}完成记录`} variant="ghost">查看记录</PlaceholderButton>
+                  <span className="tag tag--success">完成记录</span>
                 ) : (
                   <div className="chore-actions">
                     <button className="button button--secondary" type="button" onClick={() => setSwapTask(item)}><Repeat2 size={15} /> 换班</button>
@@ -107,9 +186,8 @@ export function Chores() {
         </div>
       </section>
 
-      <section className="empty-preview"><Clock3 size={24} /><div><strong>接口预留：逾期提醒</strong><span>后续可在截止前提醒负责人，并保留任务完成记录。</span></div><PlaceholderButton feature="值日提醒设置" variant="secondary">设置提醒</PlaceholderButton></section>
-
       {swapTask && <SwapModal task={swapTask} onClose={() => setSwapTask(null)} />}
+      {showSetup && <Modal title="自动排班" onClose={() => setShowSetup(false)}><SetupPlanModal onClose={() => setShowSetup(false)} /></Modal>}
     </div>
   )
 }

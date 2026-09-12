@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand'
+import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { addDaysLocal, buildShares, currentMonday, dateKey } from './selectors'
 import type {
@@ -7,6 +7,7 @@ import type {
   Agreement,
   AgreementVote,
   AppData,
+  ChoreArea,
   ChoreRule,
   ChoreTask,
   Expense,
@@ -14,6 +15,7 @@ import type {
   House,
   ID,
   Member,
+  Money,
   Supply,
 } from './types'
 
@@ -113,10 +115,10 @@ export function createSeedData(): AppData {
   ]
 
   const supplies: Supply[] = [
-    { id: 'su-tissue', houseId: HOUSE_ID, name: '抽纸', emoji: '🧻', category: '日用清洁', level: 'almost_out', stockPct: 18, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -6)), refPrice: 4580 },
-    { id: 'su-detergent', houseId: HOUSE_ID, name: '洗洁精', emoji: '🧴', category: '厨房用品', level: 'low', stockPct: 28, lastBuyerId: MEMBER_LIN, lastBoughtAt: toISO(addDays(now, -10)), refPrice: 1280 },
-    { id: 'su-bags', houseId: HOUSE_ID, name: '垃圾袋', emoji: '🗑️', category: '日用清洁', level: 'enough', stockPct: 72, lastBuyerId: MEMBER_XIA, lastBoughtAt: toISO(addDays(now, -20)), refPrice: 1990 },
-    { id: 'su-laundry', houseId: HOUSE_ID, name: '洗衣液', emoji: '🧺', category: '洗护用品', level: 'enough', stockPct: 88, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -15)), refPrice: 3690 },
+    { id: 'su-tissue', houseId: HOUSE_ID, name: '抽纸', emoji: '🧻', category: '日用清洁', cycleDays: 14, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -13)), refPrice: 4580, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
+    { id: 'su-detergent', houseId: HOUSE_ID, name: '洗洁精', emoji: '🧴', category: '厨房用品', cycleDays: 21, lastBuyerId: MEMBER_LIN, lastBoughtAt: toISO(addDays(now, -19)), refPrice: 1280, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
+    { id: 'su-bags', houseId: HOUSE_ID, name: '垃圾袋', emoji: '🗑️', category: '日用清洁', cycleDays: 21, lastBuyerId: MEMBER_XIA, lastBoughtAt: toISO(addDays(now, -8)), refPrice: 1990, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
+    { id: 'su-laundry', houseId: HOUSE_ID, name: '洗衣液', emoji: '🧺', category: '洗护用品', cycleDays: 30, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -24)), refPrice: 3690, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
   ]
 
   const agreements: Agreement[] = [
@@ -168,6 +170,9 @@ export interface AppState extends AppData {
   completeChore: (taskId: ID) => void
   generateNextWeek: () => void
   swapChore: (taskId: ID, withMemberId: ID) => void
+  recordPurchase: (supplyId: ID, price: Money, asExpense: boolean) => void
+  remindAgreement: (agreementId: ID, memberId: ID) => void
+  setupChorePlan: (areas: ChoreArea[], memberIds: ID[]) => void
   reset: () => void
 }
 
@@ -351,6 +356,143 @@ export const useStore = create<AppState>()(
             type: 'chore_swapped',
             targetId: taskId,
             summary: `将${task.title}换给了${target?.name ?? '室友'}`,
+            at: now,
+          }
+          return { choreTasks, activities: [activity, ...state.activities] }
+        })
+      },
+      recordPurchase: (supplyId, price, asExpense) => {
+        set((state) => {
+          const supply = state.supplies.find((s) => s.id === supplyId)
+          if (!supply) return {}
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? state.members[0]?.id ?? ''
+          const now = new Date().toISOString()
+          const nowDate = new Date()
+
+          let expenses = state.expenses
+          let shares = state.shares
+          let expenseId: ID | undefined
+
+          if (asExpense && price > 0) {
+            const eid = uid('e')
+            expenseId = eid
+            const split = buildShares({
+              amount: price,
+              participants: state.members.map((m) => m.id),
+              payerId: selfId,
+              splitMode: 'equal',
+            })
+            const newExpense: Expense = {
+              id: eid,
+              houseId: state.house.id,
+              title: `补货：${supply.name}`,
+              amount: price,
+              category: 'daily',
+              payerId: selfId,
+              date: dateKey(nowDate),
+              splitMode: 'equal',
+              supplyId,
+              createdAt: now,
+            }
+            const newShares: ExpenseShare[] = split.map((s) => ({
+              id: uid('s'),
+              expenseId: eid,
+              memberId: s.memberId,
+              amount: s.amount,
+              settled: s.memberId === selfId,
+              settledAt: s.memberId === selfId ? now : undefined,
+            }))
+            expenses = [...state.expenses, newExpense]
+            shares = [...state.shares, ...newShares]
+          }
+
+          const supplies = state.supplies.map((s) =>
+            s.id === supplyId ? { ...s, lastBuyerId: selfId, lastBoughtAt: now } : s,
+          )
+          const purchase = { id: uid('p'), supplyId, buyerId: selfId, price, boughtAt: now, expenseId }
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'supply_restocked',
+            targetId: supplyId,
+            summary: asExpense ? `补货了${supply.name}（¥${(price / 100).toFixed(2)}），已记入 AA` : `补货了${supply.name}`,
+            at: now,
+          }
+          return {
+            supplies,
+            purchases: [...state.purchases, purchase],
+            expenses,
+            shares,
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
+      remindAgreement: (agreementId, memberId) => {
+        set((state) => {
+          const agreement = state.agreements.find((a) => a.id === agreementId)
+          const target = state.members.find((m) => m.id === memberId)
+          if (!agreement || !target) return {}
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'agreement_reminded',
+            targetId: agreementId,
+            summary: `提醒${target.name}遵守「${agreement.title}」`,
+            at: now,
+          }
+          return { activities: [activity, ...state.activities] }
+        })
+      },
+      setupChorePlan: (areas, memberIds) => {
+        set((state) => {
+          if (areas.length === 0 || memberIds.length === 0) return {}
+          const thisWeek = dateKey(currentMonday())
+          const now = new Date().toISOString()
+          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const AREA_LABEL: Record<ChoreArea, string> = {
+            kitchen: '厨房清洁',
+            living: '客厅清洁',
+            bathroom: '卫生间清洁',
+            trash: '垃圾清理',
+            custom: '公共区域清洁',
+          }
+          const AREA_DAY_OFFSET: Record<ChoreArea, number> = {
+            kitchen: 0,
+            living: 2,
+            bathroom: 5,
+            trash: 6,
+            custom: 4,
+          }
+          const newTasks: ChoreTask[] = areas.map((area, i) => {
+            const assigneeId = memberIds[i % memberIds.length]
+            const dueDate = addDaysLocal(currentMonday(), AREA_DAY_OFFSET[area])
+            dueDate.setHours(20, 0, 0, 0)
+            return {
+              id: uid('c'),
+              houseId: state.house.id,
+              ruleId: state.choreRules.find((r) => r.area === area)?.id,
+              area,
+              title: AREA_LABEL[area],
+              assigneeId,
+              weekOf: thisWeek,
+              date: formatDate(dueDate),
+              dayLabel: DAYS[dueDate.getDay()],
+              dueAt: toISO(dueDate),
+              status: 'pending' as const,
+            }
+          })
+          const choreTasks = [...state.choreTasks.filter((c) => c.weekOf !== thisWeek), ...newTasks]
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'chore_rotated',
+            targetId: '',
+            summary: `重新安排了本周值日（${areas.length} 项任务）`,
             at: now,
           }
           return { choreTasks, activities: [activity, ...state.activities] }

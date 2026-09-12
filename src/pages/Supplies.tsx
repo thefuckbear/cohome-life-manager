@@ -1,36 +1,116 @@
-import { BellRing, Box, ListPlus, PackageCheck, Plus, ShoppingBasket } from 'lucide-react'
+import { useState } from 'react'
+import { BellRing, Box, PackageCheck, Plus, ShoppingBasket } from 'lucide-react'
+import { Modal } from '../components/Modal'
 import { PlaceholderButton } from '../components/PlaceholderButton'
+import {
+  daysUntilRestock,
+  getMember,
+  nextBuyerFor,
+  suppliesDueRestock,
+  timeAgo,
+  yuan,
+} from '../lib/selectors'
+import { useStore } from '../lib/store'
+import type { Supply } from '../lib/types'
 
-const supplies = [
-  { name: '抽纸', category: '日用清洁', level: 18, state: '即将用完', buyer: '小周', emoji: '🧻' },
-  { name: '洗洁精', category: '厨房用品', level: 28, state: '较少', buyer: '小林', emoji: '🧴' },
-  { name: '垃圾袋', category: '日用清洁', level: 72, state: '充足', buyer: '小夏', emoji: '🗑️' },
-  { name: '洗衣液', category: '洗护用品', level: 88, state: '充足', buyer: '小周', emoji: '🧺' },
-]
+function PurchaseModal({ supply, onClose }: { supply: Supply; onClose: () => void }) {
+  const store = useStore()
+  const [priceYuan, setPriceYuan] = useState('')
+  const [asExpense, setAsExpense] = useState(true)
+  const [error, setError] = useState('')
+
+  const submit = () => {
+    const price = Math.round(parseFloat(priceYuan || '0') * 100)
+    if (!(price > 0)) return setError('请填写正确的金额')
+    store.recordPurchase(supply.id, price, asExpense)
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <p className="form-label">你为「{supply.name}」补货，花了多少钱？</p>
+      <div className="form-field">
+        <label className="form-label" htmlFor="purchase-price">金额（元）</label>
+        <input
+          id="purchase-price"
+          className="form-input"
+          type="number"
+          min="0"
+          step="0.01"
+          value={priceYuan}
+          placeholder={supply.refPrice ? `参考价 ${yuan(supply.refPrice)}` : '0.00'}
+          onChange={(e) => { setPriceYuan(e.target.value); setError('') }}
+        />
+      </div>
+      <label className="participant-item" style={{ width: 'fit-content' }}>
+        <input type="checkbox" checked={asExpense} onChange={(e) => setAsExpense(e.target.checked)} />
+        <span>记入 AA 分摊（大家平摊这笔钱）</span>
+      </label>
+      {asExpense && (
+        <p className="form-label" style={{ color: '#7f8a83' }}>将生成一笔「补货：{supply.name}」的费用，由 {store.members.length} 位室友均摊。</p>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><ShoppingBasket size={15} /> 确认补货</button>
+      </div>
+    </div>
+  )
+}
 
 export function Supplies() {
+  const store = useStore()
+  const [purchaseSupply, setPurchaseSupply] = useState<Supply | null>(null)
+  const due = suppliesDueRestock(store)
+
   return (
     <div className="page module-page">
-      <section className="module-heading"><div><span className="eyebrow">常用物品，心里有数</span><h1>公共物品</h1><p>登记库存状态，及时提醒补货，不再临用才发现没有。</p></div><PlaceholderButton feature="登记公共物品" variant="primary"><Plus size={17} /> 登记物品</PlaceholderButton></section>
-      <section className="metric-row">
-        <article className="metric-card"><span className="metric-icon metric-icon--purple"><Box size={20} /></span><div><small>已登记物品</small><strong>12</strong><span>4 个物品类别</span></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon--orange"><BellRing size={20} /></span><div><small>需要补货</small><strong>2</strong><span>其中 1 件即将用完</span></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon--green"><PackageCheck size={20} /></span><div><small>本月已补充</small><strong>5</strong><span>合计支出 ¥126.40</span></div></article>
+      <section className="module-heading">
+        <div><span className="eyebrow">轮流采购，不再总是一个人买</span><h1>公共物品</h1><p>登记常用物品，自动轮换采购负责人，买完一键记账。</p></div>
+        <PlaceholderButton feature="登记公共物品" variant="primary"><Plus size={17} /> 登记物品</PlaceholderButton>
       </section>
+
+      <section className="metric-row">
+        <article className="metric-card"><span className="metric-icon metric-icon--purple"><Box size={20} /></span><div><small>已登记物品</small><strong>{store.supplies.length}</strong><span>按周期自动轮换负责人</span></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon--orange"><BellRing size={20} /></span><div><small>该补货了</small><strong>{due.length}</strong><span>周期已到，轮到下一位</span></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon--green"><PackageCheck size={20} /></span><div><small>累计采购</small><strong>{store.purchases.length}</strong><span>每次都可记入 AA 分摊</span></div></article>
+      </section>
+
       <section className="panel module-panel">
-        <div className="panel__header"><div><h2>物品库存</h2><p>使用三级状态，记录更轻松</p></div><PlaceholderButton feature="创建采购清单" variant="secondary"><ShoppingBasket size={16} /> 创建采购单</PlaceholderButton></div>
+        <div className="panel__header"><div><h2>物品采购</h2><p>谁上次买了，下次自动轮到别人</p></div></div>
         <div className="supply-grid">
-          {supplies.map((item) => (
-            <article className="supply-card" key={item.name}>
-              <div className="supply-card__top"><span className="item-emoji item-emoji--large">{item.emoji}</span><span className={`tag ${item.state === '充足' ? 'tag--success' : item.state === '较少' ? 'tag--warm' : 'tag--danger'}`}>{item.state}</span></div>
-              <h3>{item.name}</h3><span className="supply-category">{item.category}</span>
-              <div className="supply-level"><div><span style={{ width: `${item.level}%` }} /></div><small>库存状态 {item.level}%</small></div>
-              <div className="supply-card__footer"><span>上次购买：{item.buyer}</span><PlaceholderButton feature={`${item.name}状态更新`} variant="ghost">更新状态</PlaceholderButton></div>
-            </article>
-          ))}
+          {store.supplies.map((supply) => {
+            const next = nextBuyerFor(store, supply)
+            const lastBuyer = supply.lastBuyerId ? getMember(store, supply.lastBuyerId) : undefined
+            const days = daysUntilRestock(supply)
+            const overdue = days <= 0
+            return (
+              <article className="supply-card" key={supply.id}>
+                <div className="supply-card__top">
+                  <span className="item-emoji item-emoji--large">{supply.emoji}</span>
+                  <span className={`tag ${overdue ? 'tag--danger' : days <= 3 ? 'tag--warm' : 'tag--success'}`}>{overdue ? '该补货了' : `还有 ${days} 天`}</span>
+                </div>
+                <h3>{supply.name}</h3>
+                <span className="supply-category">{supply.category} · 约每 {supply.cycleDays} 天补一次</span>
+                <div className="supply-next">
+                  <span className="avatar avatar--sm" style={{ background: next?.color }}>{next?.initials}</span>
+                  <span>轮到 <strong>{next?.name}</strong> 采购</span>
+                </div>
+                <div className="supply-card__footer">
+                  <span>{lastBuyer ? `上次 ${lastBuyer.name} 买 · ${supply.lastBoughtAt ? timeAgo(supply.lastBoughtAt) : ''}` : '尚未购买'}</span>
+                  <button className="button button--primary" type="button" onClick={() => setPurchaseSupply(supply)}><ShoppingBasket size={14} /> 我买了</button>
+                </div>
+              </article>
+            )
+          })}
         </div>
       </section>
-      <section className="empty-preview"><ListPlus size={24} /><div><strong>接口预留：智能采购清单</strong><span>后续将低库存物品自动汇总，并分配采购负责人。</span></div><PlaceholderButton feature="采购负责人分配" variant="secondary">分配负责人</PlaceholderButton></section>
+
+      {purchaseSupply && (
+        <Modal title="记录补货" onClose={() => setPurchaseSupply(null)}>
+          <PurchaseModal supply={purchaseSupply} onClose={() => setPurchaseSupply(null)} />
+        </Modal>
+      )}
     </div>
   )
 }

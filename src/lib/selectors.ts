@@ -177,8 +177,21 @@ export function formatDue(dueAt: string): string {
   return `${hours} 前完成`
 }
 
-export function lowSupplies(state: AppData): Supply[] {
-  return state.supplies.filter((s) => s.level !== 'enough')
+export function daysUntilRestock(supply: Supply, now = new Date()): number {
+  if (!supply.lastBoughtAt) return -1
+  const due = new Date(supply.lastBoughtAt).getTime() + supply.cycleDays * 86_400_000
+  return Math.ceil((due - now.getTime()) / 86_400_000)
+}
+
+export function nextBuyerFor(state: AppData, supply: Supply): Member | undefined {
+  const order = supply.rotateOrder.length ? supply.rotateOrder : state.members.map((m) => m.id)
+  const idx = order.indexOf(supply.lastBuyerId ?? '')
+  const nextId = order[(idx + 1) % order.length]
+  return getMember(state, nextId)
+}
+
+export function suppliesDueRestock(state: AppData): Supply[] {
+  return state.supplies.filter((s) => daysUntilRestock(s) <= 0)
 }
 
 export function agreementAwaitingSelf(state: AppData, memberId: ID): Agreement | undefined {

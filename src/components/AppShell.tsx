@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { PLACEHOLDER_EVENT, triggerPlaceholder } from '../lib/placeholder'
+import { NOTIFY_EVENT, PLACEHOLDER_EVENT, triggerPlaceholder } from '../lib/placeholder'
 
 const navigation = [
   { to: '/', label: '今日首页', icon: Home },
@@ -36,19 +36,28 @@ function Brand() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<{ text: string; kind: 'placeholder' | 'notify' } | null>(null)
 
   useEffect(() => {
     let timer = 0
+    const show = (text: string, kind: 'placeholder' | 'notify') => {
+      setToast({ text, kind })
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setToast(null), 2400)
+    }
     const handlePlaceholder = (event: Event) => {
       const customEvent = event as CustomEvent<{ message: string }>
-      setToast(customEvent.detail.message)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => setToast(''), 2400)
+      show(customEvent.detail.message, 'placeholder')
+    }
+    const handleNotify = (event: Event) => {
+      const customEvent = event as CustomEvent<{ message: string }>
+      show(customEvent.detail.message, 'notify')
     }
     window.addEventListener(PLACEHOLDER_EVENT, handlePlaceholder)
+    window.addEventListener(NOTIFY_EVENT, handleNotify)
     return () => {
       window.removeEventListener(PLACEHOLDER_EVENT, handlePlaceholder)
+      window.removeEventListener(NOTIFY_EVENT, handleNotify)
       window.clearTimeout(timer)
     }
   }, [])
@@ -110,8 +119,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       {toast && (
         <div className="toast" role="status">
           <span className="toast__icon"><Sparkles size={17} /></span>
-          <div><strong>接口已预留</strong><span>{toast}，后续可接入真实逻辑</span></div>
-          <button aria-label="关闭提示" onClick={() => setToast('')}><X size={16} /></button>
+          <div>
+            <strong>{toast.kind === 'notify' ? '已提醒' : '接口已预留'}</strong>
+            <span>{toast.kind === 'notify' ? toast.text : `${toast.text}，后续可接入真实逻辑`}</span>
+          </div>
+          <button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button>
         </div>
       )}
     </div>

@@ -18,10 +18,11 @@ import {
   getMember,
   getSelf,
   greeting,
-  lowSupplies,
   myChoreThisWeek,
+  nextBuyerFor,
   payeesCountFor,
   pendingSharesFor,
+  suppliesDueRestock,
   timeAgo,
   todayLabel,
   yuan,
@@ -43,7 +44,7 @@ export function Dashboard() {
   const selfNet = self ? (net[self.id] ?? 0) : 0
   const myPending = self ? pendingSharesFor(store, self.id) : []
   const myChore = self ? myChoreThisWeek(store, self.id) : undefined
-  const lows = lowSupplies(store)
+  const lows = suppliesDueRestock(store)
   const pendingAgreement = self ? agreementAwaitingSelf(store, self.id) : undefined
 
   const firstPending = myPending[0]
@@ -72,8 +73,8 @@ export function Dashboard() {
   if (firstLow) {
     tasks.push({
       key: `supply-${firstLow.id}`,
-      title: `决定${firstLow.name}由谁补货`,
-      sub: `库存仅剩 ${firstLow.stockPct}%`,
+      title: `${firstLow.name}该补货了`,
+      sub: `轮到 ${nextBuyerFor(store, firstLow)?.name ?? '室友'} 采购`,
       tag: '物品',
       tagClass: '',
     })
