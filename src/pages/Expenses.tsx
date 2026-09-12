@@ -7,10 +7,12 @@ import {
   Filter,
   Plus,
   ReceiptText,
+  Settings2,
+  Trash2,
   WalletCards,
 } from 'lucide-react'
 import { Modal } from '../components/Modal'
-import { PlaceholderButton } from '../components/PlaceholderButton'
+import { notify } from '../lib/placeholder'
 import {
   computeSettlements,
   dateKey,
@@ -43,6 +45,8 @@ const CATEGORY_EMOJI: Record<ExpenseCategory, string> = {
   other: '🧾',
 }
 
+const ALL_CATEGORIES: (ExpenseCategory | 'all')[] = ['all', 'rent', 'utility', 'daily', 'internet', 'other']
+
 function ExpenseForm({ onDone }: { onDone: () => void }) {
   const store = useStore()
   const self = getSelf(store)
@@ -51,8 +55,11 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
   const [category, setCategory] = useState<ExpenseCategory>('utility')
   const [payerId, setPayerId] = useState<ID>(self?.id ?? '')
   const [date, setDate] = useState(dateKey(new Date()))
-  const [splitMode, setSplitMode] = useState<SplitMode>('equal')
-  const [participants, setParticipants] = useState<ID[]>([self?.id ?? ''])
+  const [splitMode, setSplitMode] = useState<SplitMode>(store.splitRule.mode === 'custom' ? 'custom' : 'equal')
+  const defaultParticipants = store.splitRule.participantIds.length
+    ? store.splitRule.participantIds.filter((id) => store.members.some((m) => m.id === id))
+    : store.members.map((m) => m.id)
+  const [participants, setParticipants] = useState<ID[]>(defaultParticipants)
   const [customAmounts, setCustomAmounts] = useState<Record<ID, string>>({})
   const [error, setError] = useState('')
 
@@ -113,7 +120,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           <input id="expense-amount" className="form-input" type="number" min="0" step="0.01" value={amountYuan} placeholder="0.00" onChange={(e) => setAmountYuan(e.target.value)} />
         </div>
       </div>
-      <div className="form-row">
+      <div className="form-row form-row--3">
         <div className="form-field">
           <label className="form-label" htmlFor="expense-category">分类</label>
           <select id="expense-category" className="form-select" value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
@@ -209,11 +216,12 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
 
 function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => void }) {
   const store = useStore()
+  const selfId = store.currentUserId
   const expense = store.expenses.find((e) => e.id === expenseId)
   if (!expense) return null
   const payer = getMember(store, expense.payerId)
   const shares = expenseShares(store, expenseId)
-  const unsettled = shares.filter((s) => !s.settled).length
+  const myUnsettled = shares.find((s) => !s.settled && s.memberId === selfId)
 
   return (
     <div>
@@ -228,16 +236,17 @@ function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => v
       <div className="detail-rows">
         {shares.map((s) => {
           const member = getMember(store, s.memberId)
+          const isMine = s.memberId === selfId
           return (
             <div className="detail-row" key={s.id}>
               <span className="avatar avatar--sm" style={{ background: member?.color }}>{member?.initials}</span>
               <div className="detail-row__main">
-                <strong>{member?.name}{member?.isSelf ? '（我）' : ''}</strong>
+                <strong>{member?.name}{isMine ? '（我）' : ''}</strong>
                 <span>{s.memberId === expense.payerId ? '垫付人' : '参与分摊'}</span>
               </div>
               <span className={`tag ${s.settled ? 'tag--success' : 'tag--warm'}`}>{s.settled && <Check size={12} />}{s.settled ? '已结清' : '待结算'}</span>
               <strong>¥{yuan(s.amount)}</strong>
-              {!s.settled && (
+              {!s.settled && isMine && (
                 <button className="button button--ghost" type="button" onClick={() => store.settleShare(expense.id, s.id)}>
                   标记已结清
                 </button>
@@ -246,13 +255,59 @@ function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => v
           )
         })}
       </div>
-      {unsettled > 0 && (
+      {myUnsettled && (
         <div className="modal__footer">
-          <button className="button button--primary button--full" type="button" onClick={() => store.settleShare(expense.id, shares.find((s) => !s.settled)!.id)}>
-            结清这笔费用
+          <button className="button button--primary button--full" type="button" onClick={() => store.settleShare(expense.id, myUnsettled.id)}>
+            结清我的这笔分摊
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function SplitRuleModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const [mode, setMode] = useState<'equal' | 'custom'>(store.splitRule.mode)
+  const [participantIds, setParticipantIds] = useState<ID[]>(store.splitRule.participantIds)
+
+  const toggleMember = (id: ID) => {
+    setParticipantIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const submit = () => {
+    store.saveSplitRule({ mode, participantIds })
+    notify('分摊规则已保存，新账单将默认使用')
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <span className="form-label">默认分摊方式</span>
+      <div className="split-choice">
+        <label className={`split-radio${mode === 'equal' ? ' is-checked' : ''}`}>
+          <input type="radio" name="rule-mode" checked={mode === 'equal'} onChange={() => setMode('equal')} />
+          平均分摊
+        </label>
+        <label className={`split-radio${mode === 'custom' ? ' is-checked' : ''}`}>
+          <input type="radio" name="rule-mode" checked={mode === 'custom'} onChange={() => setMode('custom')} />
+          自定义金额
+        </label>
+      </div>
+      <span className="form-label">默认参与人（不勾选 = 全体成员）</span>
+      <div className="participant-list">
+        {store.members.map((m) => (
+          <label key={m.id} className="participant-item">
+            <input type="checkbox" checked={participantIds.includes(m.id)} onChange={() => toggleMember(m.id)} />
+            <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
+            <span>{m.name}</span>
+          </label>
+        ))}
+      </div>
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><Settings2 size={15} /> 保存规则</button>
+      </div>
     </div>
   )
 }
@@ -262,17 +317,28 @@ export function Expenses() {
   const self = getSelf(store)
   const selfId = self?.id ?? ''
   const [showForm, setShowForm] = useState(false)
+  const [showRule, setShowRule] = useState(false)
   const [detailId, setDetailId] = useState<ID | null>(null)
+  const [filter, setFilter] = useState<ExpenseCategory | 'all'>('all')
 
   const payable = payableFor(store, selfId)
   const receivable = receivableFor(store, selfId)
   const total = expenseTotal(store)
   const settlements = computeSettlements(store)
-  const bills = [...store.expenses].sort((a, b) => (a.date < b.date ? 1 : -1))
+  const bills = [...store.expenses]
+    .filter((b) => filter === 'all' || b.category === filter)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
 
   const handleSettleAll = () => {
-    if (window.confirm('确定一键结清所有待结算费用吗？')) {
+    if (window.confirm('确定结清我的所有待结算分摊吗？')) {
       store.settleAll()
+    }
+  }
+
+  const handleDelete = (bill: Expense) => {
+    if (window.confirm(`确定删除账单「${bill.title}」吗？该账单的分摊记录会一并删除。`)) {
+      store.deleteExpense(bill.id)
+      notify(`已删除账单「${bill.title}」`)
     }
   }
 
@@ -280,7 +346,7 @@ export function Expenses() {
     <div className="page module-page">
       <section className="module-heading">
         <div><span className="eyebrow">费用透明，关系轻松</span><h1>费用 AA</h1><p>记录每一笔共同支出，自动算清谁该付给谁。</p></div>
-        <PlaceholderButton feature="新增费用" variant="primary" onClick={() => setShowForm(true)}><Plus size={17} /> 记一笔费用</PlaceholderButton>
+        <button className="button button--primary" type="button" onClick={() => setShowForm(true)}><Plus size={17} /> 记一笔费用</button>
       </section>
 
       <section className="metric-row">
@@ -318,14 +384,23 @@ export function Expenses() {
         <div className="panel__header">
           <div><h2>账单</h2><p>所有共同费用都在这里</p></div>
           <div className="header-actions">
-            <PlaceholderButton feature="账单筛选" variant="secondary"><Filter size={16} /> 筛选</PlaceholderButton>
-            <button className="button button--primary" type="button" onClick={handleSettleAll}><WalletCards size={16} /> 一键结算</button>
+            <select className="form-select" style={{ height: 36, width: 108 }} value={filter} onChange={(e) => setFilter(e.target.value as ExpenseCategory | 'all')}>
+              {ALL_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c === 'all' ? '全部账单' : CATEGORY_LABEL[c as ExpenseCategory]}</option>
+              ))}
+            </select>
+            <button className="button button--secondary" type="button" onClick={() => setShowRule(true)}><Settings2 size={16} /> 分摊规则</button>
+            <button className="button button--primary" type="button" onClick={handleSettleAll}><WalletCards size={16} /> 结清我的待结算</button>
           </div>
         </div>
         <div className="table-list">
+          {bills.length === 0 && (
+            <div className="table-row"><div className="table-row__main"><strong>该分类下暂无账单</strong><span>换个分类试试</span></div></div>
+          )}
           {bills.map((bill) => {
             const payer = getMember(store, bill.payerId)
             const status = expenseStatus(store, bill, selfId)
+            const canDelete = bill.createdBy ? bill.createdBy === selfId : bill.payerId === selfId
             return (
               <article className="table-row" key={bill.id}>
                 <span className="item-emoji">{CATEGORY_EMOJI[bill.category]}</span>
@@ -333,17 +408,23 @@ export function Expenses() {
                 <strong className="table-amount">¥{yuan(bill.amount)}</strong>
                 <span className={`tag tag--${status.kind}`}>{status.label}</span>
                 <button className="button button--ghost" type="button" onClick={() => setDetailId(bill.id)}>查看明细</button>
+                {canDelete && (
+                  <button className="button button--ghost" type="button" aria-label="删除账单" onClick={() => handleDelete(bill)}><Trash2 size={15} /></button>
+                )}
               </article>
             )
           })}
         </div>
       </section>
 
-      <section className="empty-preview"><ReceiptText size={24} /><div><strong>接口预留：分摊规则</strong><span>后续支持按比例分摊与账单导出。</span></div><PlaceholderButton feature="分摊规则设置" variant="secondary">设置规则</PlaceholderButton></section>
-
       {showForm && (
         <Modal title="记一笔费用" onClose={() => setShowForm(false)}>
           <ExpenseForm onDone={() => setShowForm(false)} />
+        </Modal>
+      )}
+      {showRule && (
+        <Modal title="分摊规则" onClose={() => setShowRule(false)}>
+          <SplitRuleModal onClose={() => setShowRule(false)} />
         </Modal>
       )}
       {detailId && (

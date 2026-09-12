@@ -8,11 +8,10 @@ import type {
   ID,
   Member,
   Money,
-  Supply,
 } from './types'
 
 export function getSelf(state: AppData): Member | undefined {
-  return state.members.find((m) => m.isSelf)
+  return state.members.find((m) => m.id === state.currentUserId)
 }
 
 export function getMember(state: AppData, id: ID): Member | undefined {
@@ -198,21 +197,48 @@ export function formatDue(dueAt: string): string {
   return `${hours} 前完成`
 }
 
-export function daysUntilRestock(supply: Supply, now = new Date()): number {
-  if (!supply.lastBoughtAt || !supply.cycleDays) return -1
-  const due = new Date(supply.lastBoughtAt).getTime() + supply.cycleDays * 86_400_000
-  return Math.ceil((due - now.getTime()) / 86_400_000)
+export interface NotificationItem {
+  id: string
+  kind: 'reminded' | 'settle' | 'chore'
+  text: string
+  sub: string
+  at: string
 }
 
-export function nextBuyerFor(state: AppData, supply: Supply): Member | undefined {
-  const order = supply.rotateOrder?.length ? supply.rotateOrder : state.members.map((m) => m.id)
-  const idx = order.indexOf(supply.lastBuyerId ?? '')
-  const nextId = order[(idx + 1) % order.length]
-  return getMember(state, nextId)
-}
-
-export function suppliesDueRestock(state: AppData): Supply[] {
-  return state.supplies.filter((s) => daysUntilRestock(s) <= 0)
+export function notificationsFor(state: AppData, memberId: ID): NotificationItem[] {
+  const items: NotificationItem[] = []
+  for (const act of state.activities) {
+    if (act.notifyId !== memberId) continue
+    const actor = getMember(state, act.actorId)
+    items.push({
+      id: `n-${act.id}`,
+      kind: 'reminded',
+      text: `${actor?.name ?? '室友'} 提醒了你`,
+      sub: act.summary,
+      at: act.at,
+    })
+  }
+  for (const pending of pendingSharesFor(state, memberId)) {
+    items.push({
+      id: `n-settle-${pending.share.id}`,
+      kind: 'settle',
+      text: `待支付「${pending.expense.title}」`,
+      sub: `应付给 ${pending.payer?.name ?? '室友'} ¥${yuan(pending.share.amount)}`,
+      at: pending.expense.createdAt,
+    })
+  }
+  const chore = myChoreToday(state, memberId)
+  if (chore) {
+    items.push({
+      id: `n-chore-${chore.id}`,
+      kind: 'chore',
+      text: `今天轮到你值日「${chore.title}」`,
+      sub: '今晚 20:00 前完成',
+      at: chore.dueAt,
+    })
+  }
+  items.sort((a, b) => (a.at < b.at ? 1 : -1))
+  return items
 }
 
 export function agreementAwaitingSelf(state: AppData, memberId: ID): Agreement | undefined {

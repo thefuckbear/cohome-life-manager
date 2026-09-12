@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BellRing, BookOpenCheck, Check, Clock3, Plus, ThumbsUp, Users } from 'lucide-react'
+import { BellRing, BookOpenCheck, Check, Clock3, Plus, ThumbsUp, Trash2, Users } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
 import { getMember, getSelf } from '../lib/selectors'
@@ -104,6 +104,13 @@ export function Agreements() {
   const activeCount = store.agreements.filter((a) => a.status === 'active').length
   const votingCount = store.agreements.filter((a) => a.status === 'voting').length
 
+  const handleDelete = (agreement: Agreement) => {
+    if (window.confirm(`确定删除公约「${agreement.title}」吗？`)) {
+      store.deleteAgreement(agreement.id)
+      notify(`已删除公约「${agreement.title}」`)
+    }
+  }
+
   return (
     <div className="page module-page">
       <section className="module-heading">
@@ -137,7 +144,12 @@ export function Agreements() {
                   <span>{count} / {store.members.length} 位室友已同意</span>
                 </div>
                 {isActive ? (
-                  <button className="button button--secondary" type="button" onClick={() => setRemindAgreement(item)}><BellRing size={15} /> 一键提醒</button>
+                  <div className="chore-actions">
+                    <button className="button button--secondary" type="button" onClick={() => setRemindAgreement(item)}><BellRing size={15} /> 一键提醒</button>
+                    {item.createdBy === selfId && (
+                      <button className="button button--ghost" type="button" aria-label="删除公约" onClick={() => handleDelete(item)}><Trash2 size={15} /></button>
+                    )}
+                  </div>
                 ) : hasVoted ? (
                   <span className="tag tag--success"><Check size={13} /> 我已同意</span>
                 ) : (

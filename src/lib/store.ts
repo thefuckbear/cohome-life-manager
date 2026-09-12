@@ -16,6 +16,7 @@ import type {
   ID,
   Member,
   Money,
+  SplitRule,
   Supply,
 } from './types'
 
@@ -69,6 +70,8 @@ function uid(prefix: string): ID {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+const COLOR_PALETTE = ['#e6a25a', '#6f9a83', '#7d83b7', '#c26742', '#5d8fa8', '#b78a6f']
+
 export function createSeedData(): AppData {
   const now = new Date()
   const monday = mondayOf(now)
@@ -88,9 +91,9 @@ export function createSeedData(): AppData {
   ]
 
   const expenses: Expense[] = [
-    { id: 'e-elec', houseId: HOUSE_ID, title: '9 月电费', amount: 24000, category: 'utility', payerId: MEMBER_LIN, date: dateKey(addDays(now, -2)), splitMode: 'equal', createdAt: toISO(addDays(now, -2)) },
-    { id: 'e-tissue', houseId: HOUSE_ID, title: '客厅抽纸', amount: 4500, category: 'daily', payerId: MEMBER_ZHOU, date: dateKey(addDays(now, -4)), splitMode: 'equal', createdAt: toISO(addDays(now, -4)) },
-    { id: 'e-broadband', houseId: HOUSE_ID, title: '宽带月费', amount: 12000, category: 'internet', payerId: MEMBER_XIA, date: dateKey(addDays(now, -11)), splitMode: 'equal', createdAt: toISO(addDays(now, -11)) },
+    { id: 'e-elec', houseId: HOUSE_ID, title: '9 月电费', amount: 24000, category: 'utility', payerId: MEMBER_LIN, date: dateKey(addDays(now, -2)), splitMode: 'equal', createdAt: toISO(addDays(now, -2)), createdBy: MEMBER_LIN },
+    { id: 'e-tissue', houseId: HOUSE_ID, title: '客厅抽纸', amount: 4500, category: 'daily', payerId: MEMBER_ZHOU, date: dateKey(addDays(now, -4)), splitMode: 'equal', createdAt: toISO(addDays(now, -4)), createdBy: MEMBER_ZHOU },
+    { id: 'e-broadband', houseId: HOUSE_ID, title: '宽带月费', amount: 12000, category: 'internet', payerId: MEMBER_XIA, date: dateKey(addDays(now, -11)), splitMode: 'equal', createdAt: toISO(addDays(now, -11)), createdBy: MEMBER_XIA },
   ]
 
   const shares: ExpenseShare[] = [
@@ -123,10 +126,10 @@ export function createSeedData(): AppData {
   ]
 
   const supplies: Supply[] = [
-    { id: 'su-tissue', houseId: HOUSE_ID, name: '抽纸', emoji: '🧻', category: '日用清洁', cycleDays: 14, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -13)), refPrice: 4580, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
-    { id: 'su-detergent', houseId: HOUSE_ID, name: '洗洁精', emoji: '🧴', category: '厨房用品', cycleDays: 21, lastBuyerId: MEMBER_LIN, lastBoughtAt: toISO(addDays(now, -19)), refPrice: 1280, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
-    { id: 'su-bags', houseId: HOUSE_ID, name: '垃圾袋', emoji: '🗑️', category: '日用清洁', cycleDays: 21, lastBuyerId: MEMBER_XIA, lastBoughtAt: toISO(addDays(now, -8)), refPrice: 1990, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
-    { id: 'su-laundry', houseId: HOUSE_ID, name: '洗衣液', emoji: '🧺', category: '洗护用品', cycleDays: 30, lastBuyerId: MEMBER_ZHOU, lastBoughtAt: toISO(addDays(now, -24)), refPrice: 3690, rotateOrder: [MEMBER_ZHOU, MEMBER_LIN, MEMBER_XIA] },
+    { id: 'su-tissue', houseId: HOUSE_ID, name: '抽纸', emoji: '🧻', category: '日用清洁', createdBy: MEMBER_ZHOU, createdAt: toISO(addDays(now, -4)), refPrice: 4500 },
+    { id: 'su-detergent', houseId: HOUSE_ID, name: '洗洁精', emoji: '🧴', category: '厨房用品', createdBy: MEMBER_LIN, createdAt: toISO(addDays(now, -9)), refPrice: 1280 },
+    { id: 'su-bags', houseId: HOUSE_ID, name: '垃圾袋', emoji: '🗑️', category: '日用清洁', createdBy: MEMBER_XIA, createdAt: toISO(addDays(now, -14)), refPrice: 1990 },
+    { id: 'su-laundry', houseId: HOUSE_ID, name: '洗衣液', emoji: '🧺', category: '洗护用品', createdBy: MEMBER_ZHOU, createdAt: toISO(addDays(now, -18)), refPrice: 3690 },
   ]
 
   const agreements: Agreement[] = [
@@ -151,9 +154,9 @@ export function createSeedData(): AppData {
   ]
 
   const activities: ActivityEvent[] = [
-    { id: 'a1', houseId: HOUSE_ID, actorId: MEMBER_LIN, type: 'expense_added', targetId: 'e-elec', summary: '添加了 9 月电费', at: toISO(addDays(now, -1)) },
+    { id: 'a1', houseId: HOUSE_ID, actorId: MEMBER_LIN, type: 'expense_added', targetId: 'e-elec', summary: '添加了 9 月电费', at: toISO(addDays(now, -2)) },
     { id: 'a2', houseId: HOUSE_ID, actorId: MEMBER_XIA, type: 'chore_done', targetId: 'c-living', summary: '完成了客厅清洁', at: toISO(addDays(now, -1)) },
-    { id: 'a3', houseId: HOUSE_ID, actorId: MEMBER_ZHOU, type: 'supply_low', targetId: 'su-tissue', summary: '将抽纸标记为即将用完', at: toISO(addDays(now, -1)) },
+    { id: 'a3', houseId: HOUSE_ID, actorId: MEMBER_ZHOU, type: 'supply_restocked', targetId: 'su-tissue', summary: '登记了公共物品：抽纸', at: toISO(addDays(now, -4)) },
   ]
 
   return {
@@ -168,22 +171,31 @@ export function createSeedData(): AppData {
     agreements,
     votes,
     activities,
+    currentUserId: MEMBER_ZHOU,
+    splitRule: { mode: 'equal', participantIds: [] },
   }
 }
 
 export interface AppState extends AppData {
   addExpense: (input: AddExpenseInput) => void
+  deleteExpense: (expenseId: ID) => void
   settleShare: (expenseId: ID, shareId: ID) => void
   settleAll: () => void
   completeChore: (taskId: ID) => void
   generateNextWeek: () => void
   swapChore: (taskId: ID, withMemberId: ID) => void
-  recordPurchase: (supplyId: ID, price: Money, asExpense: boolean) => void
-  remindAgreement: (agreementId: ID, memberId: ID) => void
-  setupChorePlan: (areas: ChoreArea[], memberIds: ID[]) => void
-  assignChoreTask: (area: ChoreArea, memberId: ID, dayOffset: number) => void
+  assignChoreTask: (area: ChoreArea, date: string) => void
+  deleteChoreTask: (taskId: ID) => void
+  remindChore: (taskId: ID) => void
+  registerSupply: (name: string, emoji: string, category: string, price: Money) => void
+  deleteSupply: (supplyId: ID) => void
   proposeAgreement: (title: string, content: string, category: string, icon: string) => void
+  deleteAgreement: (agreementId: ID) => void
   voteAgreement: (agreementId: ID, agree: boolean) => void
+  remindAgreement: (agreementId: ID, memberId: ID) => void
+  addMember: (name: string) => void
+  switchAccount: (memberId: ID) => void
+  saveSplitRule: (rule: SplitRule) => void
   reset: () => void
 }
 
@@ -196,7 +208,7 @@ export const useStore = create<AppState>()(
         const expenseId = uid('e')
         const now = new Date().toISOString()
         set((state) => {
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? payerId
+          const selfId = state.currentUserId
           const split = buildShares({
             amount,
             participants,
@@ -214,6 +226,7 @@ export const useStore = create<AppState>()(
             date,
             splitMode: splitMode === 'ratio' ? 'equal' : splitMode,
             createdAt: now,
+            createdBy: selfId,
           }
           const newShares: ExpenseShare[] = split.map((s) => ({
             id: uid('s'),
@@ -239,20 +252,42 @@ export const useStore = create<AppState>()(
           }
         })
       },
+      deleteExpense: (expenseId) => {
+        set((state) => {
+          const expense = state.expenses.find((e) => e.id === expenseId)
+          if (!expense) return {}
+          if (expense.createdBy && expense.createdBy !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'expense_added',
+            targetId: expenseId,
+            summary: `删除了账单「${expense.title}」`,
+            at: now,
+          }
+          return {
+            expenses: state.expenses.filter((e) => e.id !== expenseId),
+            shares: state.shares.filter((s) => s.expenseId !== expenseId),
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
       settleShare: (expenseId, shareId) => {
         set((state) => {
           const share = state.shares.find((s) => s.id === shareId)
           if (!share) return {}
+          if (share.memberId !== state.currentUserId) return {}
           const expense = state.expenses.find((e) => e.id === expenseId)
           const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? share.memberId
           const shares = state.shares.map((s) =>
             s.id === shareId ? { ...s, settled: true, settledAt: now } : s,
           )
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'expense_settled',
             targetId: expenseId,
             summary: `结清了 ${expense?.title ?? '一笔费用'}`,
@@ -263,18 +298,19 @@ export const useStore = create<AppState>()(
       },
       settleAll: () => {
         set((state) => {
+          const myShares = state.shares.filter((s) => !s.settled && s.memberId === state.currentUserId)
+          if (myShares.length === 0) return {}
           const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
           const shares = state.shares.map((s) =>
-            s.settled ? s : { ...s, settled: true, settledAt: now },
+            !s.settled && s.memberId === state.currentUserId ? { ...s, settled: true, settledAt: now } : s,
           )
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'expense_settled',
             targetId: '',
-            summary: '一键结清了所有待结算费用',
+            summary: `一键结清了我的 ${myShares.length} 笔待结算`,
             at: now,
           }
           return { shares, activities: [activity, ...state.activities] }
@@ -284,15 +320,15 @@ export const useStore = create<AppState>()(
         set((state) => {
           const task = state.choreTasks.find((c) => c.id === taskId)
           if (!task) return {}
+          if (task.assigneeId !== state.currentUserId) return {}
           const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? task.assigneeId
           const choreTasks = state.choreTasks.map((c) =>
-            c.id === taskId ? { ...c, status: 'done' as const, completedAt: now, completedBy: selfId } : c,
+            c.id === taskId ? { ...c, status: 'done' as const, completedAt: now, completedBy: state.currentUserId } : c,
           )
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'chore_done',
             targetId: taskId,
             summary: `完成了${task.title}`,
@@ -309,7 +345,6 @@ export const useStore = create<AppState>()(
           const nextWeek = dateKey(nextMonday)
           if (state.choreTasks.some((c) => c.weekOf === nextWeek)) return {}
           const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
           const newTasks: ChoreTask[] = state.choreTasks
             .filter((c) => c.weekOf === thisWeek)
             .map((task) => {
@@ -341,7 +376,7 @@ export const useStore = create<AppState>()(
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'chore_rotated',
             targetId: '',
             summary: '生成了下周值日排班',
@@ -355,7 +390,6 @@ export const useStore = create<AppState>()(
           const task = state.choreTasks.find((c) => c.id === taskId)
           if (!task || task.assigneeId === withMemberId) return {}
           const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? task.assigneeId
           const target = state.members.find((m) => m.id === withMemberId)
           const choreTasks = state.choreTasks.map((c) =>
             c.id === taskId ? { ...c, assigneeId: withMemberId, swappedFromId: task.assigneeId } : c,
@@ -363,7 +397,7 @@ export const useStore = create<AppState>()(
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'chore_swapped',
             targetId: taskId,
             summary: `将${task.title}换给了${target?.name ?? '室友'}`,
@@ -372,153 +406,21 @@ export const useStore = create<AppState>()(
           return { choreTasks, activities: [activity, ...state.activities] }
         })
       },
-      recordPurchase: (supplyId, price, asExpense) => {
+      assignChoreTask: (area, date) => {
         set((state) => {
-          const supply = state.supplies.find((s) => s.id === supplyId)
-          if (!supply) return {}
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? state.members[0]?.id ?? ''
+          const [y, m, d] = date.split('-').map(Number)
+          if (!y || !m || !d) return {}
+          const dueDate = new Date(y, m - 1, d, 20, 0, 0, 0)
+          const weekOf = dateKey(currentMonday(dueDate))
           const now = new Date().toISOString()
-          const nowDate = new Date()
-
-          let expenses = state.expenses
-          let shares = state.shares
-          let expenseId: ID | undefined
-
-          if (asExpense && price > 0) {
-            const eid = uid('e')
-            expenseId = eid
-            const split = buildShares({
-              amount: price,
-              participants: state.members.map((m) => m.id),
-              payerId: selfId,
-              splitMode: 'equal',
-            })
-            const newExpense: Expense = {
-              id: eid,
-              houseId: state.house.id,
-              title: `补货：${supply.name}`,
-              amount: price,
-              category: 'daily',
-              payerId: selfId,
-              date: dateKey(nowDate),
-              splitMode: 'equal',
-              supplyId,
-              createdAt: now,
-            }
-            const newShares: ExpenseShare[] = split.map((s) => ({
-              id: uid('s'),
-              expenseId: eid,
-              memberId: s.memberId,
-              amount: s.amount,
-              settled: s.memberId === selfId,
-              settledAt: s.memberId === selfId ? now : undefined,
-            }))
-            expenses = [...state.expenses, newExpense]
-            shares = [...state.shares, ...newShares]
-          }
-
-          const supplies = state.supplies.map((s) =>
-            s.id === supplyId ? { ...s, lastBuyerId: selfId, lastBoughtAt: now } : s,
-          )
-          const purchase = { id: uid('p'), supplyId, buyerId: selfId, price, boughtAt: now, expenseId }
-          const activity: ActivityEvent = {
-            id: uid('a'),
-            houseId: state.house.id,
-            actorId: selfId,
-            type: 'supply_restocked',
-            targetId: supplyId,
-            summary: asExpense ? `补货了${supply.name}（¥${(price / 100).toFixed(2)}），已记入 AA` : `补货了${supply.name}`,
-            at: now,
-          }
-          return {
-            supplies,
-            purchases: [...state.purchases, purchase],
-            expenses,
-            shares,
-            activities: [activity, ...state.activities],
-          }
-        })
-      },
-      remindAgreement: (agreementId, memberId) => {
-        set((state) => {
-          const agreement = state.agreements.find((a) => a.id === agreementId)
-          const target = state.members.find((m) => m.id === memberId)
-          if (!agreement || !target) return {}
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
-          const now = new Date().toISOString()
-          const activity: ActivityEvent = {
-            id: uid('a'),
-            houseId: state.house.id,
-            actorId: selfId,
-            type: 'agreement_reminded',
-            targetId: agreementId,
-            summary: `提醒${target.name}遵守「${agreement.title}」`,
-            at: now,
-          }
-          return { activities: [activity, ...state.activities] }
-        })
-      },
-      setupChorePlan: (areas, memberIds) => {
-        set((state) => {
-          if (areas.length === 0 || memberIds.length === 0) return {}
-          const thisWeek = dateKey(currentMonday())
-          const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
-          const AREA_DAY_OFFSET: Record<ChoreArea, number> = {
-            kitchen: 0,
-            living: 2,
-            bathroom: 5,
-            trash: 6,
-            custom: 4,
-          }
-          const newTasks: ChoreTask[] = areas.map((area, i) => {
-            const assigneeId = memberIds[i % memberIds.length]
-            const dueDate = addDaysLocal(currentMonday(), AREA_DAY_OFFSET[area])
-            dueDate.setHours(20, 0, 0, 0)
-            return {
-              id: uid('c'),
-              houseId: state.house.id,
-              ruleId: state.choreRules.find((r) => r.area === area)?.id,
-              area,
-              title: AREA_LABEL[area],
-              assigneeId,
-              weekOf: thisWeek,
-              date: formatDate(dueDate),
-              dayLabel: DAYS[dueDate.getDay()],
-              dueAt: toISO(dueDate),
-              status: 'pending' as const,
-            }
-          })
-          const choreTasks = [...state.choreTasks.filter((c) => c.weekOf !== thisWeek), ...newTasks]
-          const activity: ActivityEvent = {
-            id: uid('a'),
-            houseId: state.house.id,
-            actorId: selfId,
-            type: 'chore_rotated',
-            targetId: '',
-            summary: `重新安排了本周值日（${areas.length} 项任务）`,
-            at: now,
-          }
-          return { choreTasks, activities: [activity, ...state.activities] }
-        })
-      },
-      assignChoreTask: (area, memberId, dayOffset) => {
-        set((state) => {
-          const member = state.members.find((m) => m.id === memberId)
-          if (!member) return {}
-          const thisWeek = dateKey(currentMonday())
-          const now = new Date().toISOString()
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
-          const dueDate = addDaysLocal(currentMonday(), dayOffset)
-          dueDate.setHours(20, 0, 0, 0)
           const task: ChoreTask = {
             id: uid('c'),
             houseId: state.house.id,
             ruleId: state.choreRules.find((r) => r.area === area)?.id,
             area,
             title: AREA_LABEL[area],
-            assigneeId: memberId,
-            weekOf: thisWeek,
+            assigneeId: state.currentUserId,
+            weekOf,
             date: formatDate(dueDate),
             dayLabel: DAYS[dueDate.getDay()],
             dueAt: toISO(dueDate),
@@ -527,18 +429,136 @@ export const useStore = create<AppState>()(
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
-            actorId: selfId,
+            actorId: state.currentUserId,
             type: 'chore_rotated',
             targetId: task.id,
-            summary: `安排${member.name}在${DAYS[dueDate.getDay()]}负责${AREA_LABEL[area]}`,
+            summary: `认领了${DAYS[dueDate.getDay()]}的${AREA_LABEL[area]}值日`,
             at: now,
           }
           return { choreTasks: [...state.choreTasks, task], activities: [activity, ...state.activities] }
         })
       },
+      deleteChoreTask: (taskId) => {
+        set((state) => {
+          const task = state.choreTasks.find((c) => c.id === taskId)
+          if (!task) return {}
+          if (task.assigneeId !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'chore_rotated',
+            targetId: taskId,
+            summary: `删除了值日任务「${task.title}」`,
+            at: now,
+          }
+          return {
+            choreTasks: state.choreTasks.filter((c) => c.id !== taskId),
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
+      remindChore: (taskId) => {
+        set((state) => {
+          const task = state.choreTasks.find((c) => c.id === taskId)
+          if (!task) return {}
+          const target = state.members.find((m) => m.id === task.assigneeId)
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'chore_reminded',
+            targetId: taskId,
+            summary: `提醒${target?.name ?? '室友'}完成「${task.title}」值日`,
+            at: now,
+            notifyId: task.assigneeId,
+          }
+          return { activities: [activity, ...state.activities] }
+        })
+      },
+      registerSupply: (name, emoji, category, price) => {
+        set((state) => {
+          const selfId = state.currentUserId
+          const now = new Date().toISOString()
+          const existing = state.supplies.find((s) => s.name === name)
+          const supplyId = existing?.id ?? uid('su')
+          const supplies = existing
+            ? state.supplies.map((s) => (s.id === supplyId ? { ...s, refPrice: price, createdBy: selfId, createdAt: now, emoji, category } : s))
+            : [...state.supplies, { id: supplyId, houseId: state.house.id, name, emoji, category, createdBy: selfId, createdAt: now, refPrice: price }]
+
+          const eid = uid('e')
+          const split = buildShares({
+            amount: price,
+            participants: state.members.map((m) => m.id),
+            payerId: selfId,
+            splitMode: 'equal',
+          })
+          const newExpense: Expense = {
+            id: eid,
+            houseId: state.house.id,
+            title: `公共物品：${name}`,
+            amount: price,
+            category: 'daily',
+            payerId: selfId,
+            date: dateKey(new Date()),
+            splitMode: 'equal',
+            supplyId,
+            createdAt: now,
+            createdBy: selfId,
+          }
+          const newShares: ExpenseShare[] = split.map((s) => ({
+            id: uid('s'),
+            expenseId: eid,
+            memberId: s.memberId,
+            amount: s.amount,
+            settled: s.memberId === selfId,
+            settledAt: s.memberId === selfId ? now : undefined,
+          }))
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: selfId,
+            type: 'supply_restocked',
+            targetId: supplyId,
+            summary: `登记了公共物品「${name}」（¥${(price / 100).toFixed(2)}），已生成 AA 账单`,
+            at: now,
+          }
+          return {
+            supplies,
+            purchases: [...state.purchases, { id: uid('p'), supplyId, buyerId: selfId, price, boughtAt: now, expenseId: eid }],
+            expenses: [...state.expenses, newExpense],
+            shares: [...state.shares, ...newShares],
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
+      deleteSupply: (supplyId) => {
+        set((state) => {
+          const supply = state.supplies.find((s) => s.id === supplyId)
+          if (!supply) return {}
+          if (supply.createdBy !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'supply_restocked',
+            targetId: supplyId,
+            summary: `移除了公共物品「${supply.name}」`,
+            at: now,
+          }
+          return {
+            supplies: state.supplies.filter((s) => s.id !== supplyId),
+            purchases: state.purchases.filter((p) => p.supplyId !== supplyId),
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
       proposeAgreement: (title, content, category, icon) => {
         set((state) => {
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const selfId = state.currentUserId
           const now = new Date().toISOString()
           const agreement: Agreement = {
             id: uid('ag'),
@@ -564,16 +584,37 @@ export const useStore = create<AppState>()(
           return { agreements: [...state.agreements, agreement], activities: [activity, ...state.activities] }
         })
       },
+      deleteAgreement: (agreementId) => {
+        set((state) => {
+          const agreement = state.agreements.find((a) => a.id === agreementId)
+          if (!agreement) return {}
+          if (agreement.createdBy !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'agreement_proposed',
+            targetId: agreementId,
+            summary: `删除了公约「${agreement.title}」`,
+            at: now,
+          }
+          return {
+            agreements: state.agreements.filter((a) => a.id !== agreementId),
+            votes: state.votes.filter((v) => v.agreementId !== agreementId),
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
       voteAgreement: (agreementId, agree) => {
         set((state) => {
           const agreement = state.agreements.find((a) => a.id === agreementId)
           if (!agreement) return {}
-          const selfId = state.members.find((m) => m.isSelf)?.id ?? ''
+          const selfId = state.currentUserId
           const now = new Date().toISOString()
           const alreadyVoted = state.votes.some((v) => v.agreementId === agreementId && v.memberId === selfId)
-          const votes = alreadyVoted
-            ? state.votes.map((v) => (v.agreementId === agreementId && v.memberId === selfId ? { ...v, agree, votedAt: now } : v))
-            : [...state.votes, { id: uid('v'), agreementId, memberId: selfId, agree, votedAt: now }]
+          if (alreadyVoted) return {}
+          const votes = [...state.votes, { id: uid('v'), agreementId, memberId: selfId, agree, votedAt: now }]
           const agreeCount = votes.filter((v) => v.agreementId === agreementId && v.agree).length
           const allAgreed = agreeCount >= state.members.length
           const agreements = state.agreements.map((a) =>
@@ -585,17 +626,72 @@ export const useStore = create<AppState>()(
             actorId: selfId,
             type: 'agreement_voted',
             targetId: agreementId,
-            summary: allAgreed ? `「${agreement.title}」全员通过，已生效` : `${agree ? '同意' : '反对'}了「${agreement.title}」`,
+            summary: allAgreed ? `「${agreement.title}」全员通过，已生效` : `同意了「${agreement.title}」`,
             at: now,
           }
           return { votes, agreements, activities: [activity, ...state.activities] }
         })
       },
+      remindAgreement: (agreementId, memberId) => {
+        set((state) => {
+          const agreement = state.agreements.find((a) => a.id === agreementId)
+          const target = state.members.find((m) => m.id === memberId)
+          if (!agreement || !target) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'agreement_reminded',
+            targetId: agreementId,
+            summary: `提醒${target.name}遵守「${agreement.title}」`,
+            at: now,
+            notifyId: memberId,
+          }
+          return { activities: [activity, ...state.activities] }
+        })
+      },
+      addMember: (name) => {
+        set((state) => {
+          if (!name.trim()) return {}
+          const now = new Date().toISOString()
+          const member: Member = {
+            id: uid('m'),
+            houseId: state.house.id,
+            name: name.trim(),
+            initials: name.trim().slice(0, 1),
+            color: COLOR_PALETTE[state.members.length % COLOR_PALETTE.length],
+            isSelf: false,
+            role: 'member',
+            joinedAt: now,
+            status: '在家',
+          }
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'member_added',
+            targetId: member.id,
+            summary: `邀请 ${member.name} 加入了${state.house.name}`,
+            at: now,
+          }
+          return { members: [...state.members, member], activities: [activity, ...state.activities] }
+        })
+      },
+      switchAccount: (memberId) => {
+        set((state) => {
+          if (!state.members.some((m) => m.id === memberId)) return {}
+          return { currentUserId: memberId }
+        })
+      },
+      saveSplitRule: (rule) => {
+        set({ splitRule: rule })
+      },
       reset: () => set({ ...createSeedData() }),
     }),
     {
       name: 'cohome:store',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         house: state.house,
@@ -609,6 +705,8 @@ export const useStore = create<AppState>()(
         agreements: state.agreements,
         votes: state.votes,
         activities: state.activities,
+        currentUserId: state.currentUserId,
+        splitRule: state.splitRule,
       }),
     },
   ),

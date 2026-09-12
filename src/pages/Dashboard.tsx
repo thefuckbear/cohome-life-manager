@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ArrowRight,
   Box,
@@ -11,7 +12,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { PlaceholderButton } from '../components/PlaceholderButton'
+import { Modal } from '../components/Modal'
+import { notify } from '../lib/placeholder'
 import {
   agreementAwaitingSelf,
   computeNetBalances,
@@ -19,10 +21,9 @@ import {
   getSelf,
   greeting,
   myChoreThisWeek,
-  nextBuyerFor,
+  myChoreToday,
   payeesCountFor,
   pendingSharesFor,
-  suppliesDueRestock,
   timeAgo,
   todayLabel,
   yuan,
@@ -31,24 +32,51 @@ import { useStore } from '../lib/store'
 
 const quickActions = [
   { title: '记一笔费用', text: '房租、水电或日用品', icon: ReceiptText, color: 'mint', to: '/expenses' },
-  { title: '安排值日', text: '查看本周清洁计划', icon: CalendarDays, color: 'lavender', to: '/chores' },
-  { title: '登记物品', text: '记录库存与补货', icon: Box, color: 'peach', to: '/supplies' },
+  { title: '认领值日', text: '自觉认领本周清洁', icon: CalendarDays, color: 'lavender', to: '/chores' },
+  { title: '登记物品', text: '公共物品 AA 分摊', icon: Box, color: 'peach', to: '/supplies' },
 ]
+
+function AddMemberModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+
+  const submit = () => {
+    if (!name.trim()) return setError('请填写室友名字')
+    store.addMember(name.trim())
+    notify(`已邀请 ${name.trim()} 加入${store.house.name}`)
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <div className="form-field">
+        <label className="form-label" htmlFor="member-name">室友名字</label>
+        <input id="member-name" className="form-input" value={name} placeholder="例如：小陈" onChange={(e) => { setName(e.target.value); setError('') }} />
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><Plus size={15} /> 邀请加入</button>
+      </div>
+    </div>
+  )
+}
 
 export function Dashboard() {
   const navigate = useNavigate()
   const store = useStore()
   const self = getSelf(store)
+  const [showAddMember, setShowAddMember] = useState(false)
 
   const net = computeNetBalances(store)
   const selfNet = self ? (net[self.id] ?? 0) : 0
   const myPending = self ? pendingSharesFor(store, self.id) : []
   const myChore = self ? myChoreThisWeek(store, self.id) : undefined
-  const lows = suppliesDueRestock(store)
+  const myToday = self ? myChoreToday(store, self.id) : undefined
   const pendingAgreement = self ? agreementAwaitingSelf(store, self.id) : undefined
 
   const firstPending = myPending[0]
-  const firstLow = lows[0]
 
   const tasks: { key: string; title: string; sub: string; tag: string; tagClass: string }[] = []
   if (firstPending) {
@@ -56,8 +84,17 @@ export function Dashboard() {
       key: `pay-${firstPending.share.id}`,
       title: `支付 ${firstPending.expense.title}分摊`,
       sub: `应付给${firstPending.payer?.name ?? '室友'} ¥${yuan(firstPending.share.amount)}`,
-      tag: '今天截止',
+      tag: '待支付',
       tagClass: 'tag--danger',
+    })
+  }
+  if (myToday) {
+    tasks.push({
+      key: `chore-${myToday.id}`,
+      title: `今天值日：${myToday.title}`,
+      sub: '今晚 20:00 前完成',
+      tag: '值日',
+      tagClass: 'tag--warm',
     })
   }
   if (pendingAgreement) {
@@ -68,15 +105,6 @@ export function Dashboard() {
       sub: `${creator?.name ?? '室友'}在 ${timeAgo(pendingAgreement.createdAt)}发起`,
       tag: '待确认',
       tagClass: 'tag--warm',
-    })
-  }
-  if (firstLow) {
-    tasks.push({
-      key: `supply-${firstLow.id}`,
-      title: `${firstLow.name}该补货了`,
-      sub: `轮到 ${nextBuyerFor(store, firstLow)?.name ?? '室友'} 采购`,
-      tag: '物品',
-      tagClass: '',
     })
   }
 
@@ -96,7 +124,6 @@ export function Dashboard() {
           <p>{store.house.name}今天很平静，还有 {tasks.length} 件小事等你处理。</p>
         </div>
         <div className="welcome-actions">
-          <PlaceholderButton feature="创建新事项" variant="primary"><Plus size={17} /> 创建新事项</PlaceholderButton>
           <button className="button button--secondary" type="button" onClick={handleReset}><RotateCcw size={15} /> 重置演示数据</button>
         </div>
       </section>
@@ -112,13 +139,13 @@ export function Dashboard() {
           <div className="summary-card__top"><span className="summary-icon summary-icon--lavender"><CalendarDays size={21} /></span><span className="tag">本周</span></div>
           <span className="summary-label">我的值日</span>
           <strong className="summary-value summary-value--text">{myChore ? myChore.title : '本周无排班'}</strong>
-          <span className="summary-note"><Clock3 size={14} /> {myChore ? `${new Date(myChore.dueAt).getHours().toString().padStart(2, '0')}:00 前完成` : '好好休息一下'}</span>
+          <span className="summary-note"><Clock3 size={14} /> {myChore ? `${new Date(myChore.dueAt).getHours().toString().padStart(2, '0')}:00 前完成` : '自觉认领一个吧'}</span>
         </article>
         <article className="summary-card">
-          <div className="summary-card__top"><span className="summary-icon summary-icon--peach"><Box size={21} /></span><span className="tag tag--danger">需关注</span></div>
+          <div className="summary-card__top"><span className="summary-icon summary-icon--peach"><Box size={21} /></span><span className="tag tag--success">自愿登记</span></div>
           <span className="summary-label">公共物品</span>
-          <strong className="summary-value summary-value--text">{lows.length} 件快用完</strong>
-          <span className="summary-note">{lows.length ? `${lows.map((s) => s.name).join('、')}需要补货` : '库存充足'}</span>
+          <strong className="summary-value summary-value--text">{store.supplies.length} 件公共物品</strong>
+          <span className="summary-note">{store.supplies.length ? '登记即生成 AA 账单' : '还没有登记'}</span>
         </article>
         <article className="summary-card summary-card--score">
           <div className="summary-card__top"><span className="summary-icon summary-icon--green"><Sparkles size={21} /></span><span className="tag tag--success">+6</span></div>
@@ -139,11 +166,11 @@ export function Dashboard() {
                   <div className="task-body"><strong>{task.title}</strong><span>{task.sub}</span></div>
                   <span className={`tag ${task.tagClass}`}>{task.tag}</span>
                   {task.key.startsWith('pay-') ? (
-                    <PlaceholderButton feature="费用支付" variant="ghost">去处理</PlaceholderButton>
+                    <button className="button button--ghost" onClick={() => navigate('/expenses')}>去支付</button>
                   ) : task.key.startsWith('agree-') ? (
                     <button className="button button--ghost" onClick={() => navigate('/agreements')}>去看看</button>
                   ) : (
-                    <button className="button button--ghost" onClick={() => navigate('/supplies')}>去分配</button>
+                    <button className="button button--ghost" onClick={() => navigate('/chores')}>去完成</button>
                   )}
                 </article>
               ))}
@@ -174,18 +201,18 @@ export function Dashboard() {
               {store.members.map((member) => (
                 <div className="roommate" key={member.id}>
                   <span className="avatar" style={{ background: member.color }}>{member.initials}</span>
-                  <div><strong>{member.name}{member.isSelf && <em>我</em>}</strong><span>{member.status}</span></div>
+                  <div><strong>{member.name}{member.id === store.currentUserId && <em>我</em>}</strong><span>{member.status}</span></div>
                   <span className={`presence ${member.status === '在家' ? 'is-home' : ''}`} />
                 </div>
               ))}
             </div>
-            <PlaceholderButton feature="邀请新室友" variant="secondary" className="button--full"><Plus size={16} /> 邀请新室友</PlaceholderButton>
+            <button className="button button--secondary button--full" type="button" onClick={() => setShowAddMember(true)}><Plus size={16} /> 邀请新室友</button>
           </section>
 
           <section className="panel activity-panel">
             <div className="panel__header"><div><h2>最近动态</h2><p>生活变化都有记录</p></div></div>
             <div className="activity-list">
-              {store.activities.map((item) => {
+              {store.activities.slice(0, 6).map((item) => {
                 const actor = getMember(store, item.actorId)
                 return (
                   <div className="activity" key={item.id}>
@@ -195,10 +222,15 @@ export function Dashboard() {
                 )
               })}
             </div>
-            <PlaceholderButton feature="全部动态" variant="ghost" className="button--full">查看全部动态 <ArrowRight size={15} /></PlaceholderButton>
           </section>
         </aside>
       </section>
+
+      {showAddMember && (
+        <Modal title="邀请新室友" onClose={() => setShowAddMember(false)}>
+          <AddMemberModal onClose={() => setShowAddMember(false)} />
+        </Modal>
+      )}
     </div>
   )
 }

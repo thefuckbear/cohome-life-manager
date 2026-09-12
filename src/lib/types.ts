@@ -46,6 +46,7 @@ export interface Expense {
   note?: string
   supplyId?: ID
   createdAt: string
+  createdBy?: ID
 }
 
 export interface ExpenseShare {
@@ -94,11 +95,9 @@ export interface Supply {
   name: string
   emoji: string
   category: string
-  cycleDays: number
-  lastBuyerId?: ID
-  lastBoughtAt?: string
+  createdBy: ID
+  createdAt: string
   refPrice?: Money
-  rotateOrder: ID[]
 }
 
 export interface PurchaseLog {
@@ -145,6 +144,8 @@ export type ActivityType =
   | 'agreement_voted'
   | 'agreement_reminded'
   | 'agreement_proposed'
+  | 'chore_reminded'
+  | 'member_added'
 
 export interface ActivityEvent {
   id: ID
@@ -154,6 +155,12 @@ export interface ActivityEvent {
   targetId: ID
   summary: string
   at: string
+  notifyId?: ID
+}
+
+export interface SplitRule {
+  mode: 'equal' | 'custom'
+  participantIds: ID[]
 }
 
 export interface AppData {
@@ -168,4 +175,6 @@ export interface AppData {
   agreements: Agreement[]
   votes: AgreementVote[]
   activities: ActivityEvent[]
+  currentUserId: ID
+  splitRule: SplitRule
 }
