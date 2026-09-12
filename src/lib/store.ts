@@ -18,6 +18,7 @@ import type {
   Money,
   SplitRule,
   Supply,
+  SwapRequest,
 } from './types'
 
 const HOUSE_ID = 'h-main'
@@ -92,7 +93,7 @@ export function createSeedData(): AppData {
 
   const expenses: Expense[] = [
     { id: 'e-elec', houseId: HOUSE_ID, title: '9 月电费', amount: 24000, category: 'utility', payerId: MEMBER_LIN, date: dateKey(addDays(now, -2)), splitMode: 'equal', createdAt: toISO(addDays(now, -2)), createdBy: MEMBER_LIN },
-    { id: 'e-tissue', houseId: HOUSE_ID, title: '客厅抽纸', amount: 4500, category: 'daily', payerId: MEMBER_ZHOU, date: dateKey(addDays(now, -4)), splitMode: 'equal', createdAt: toISO(addDays(now, -4)), createdBy: MEMBER_ZHOU },
+    { id: 'e-tissue', houseId: HOUSE_ID, title: '客厅抽纸', amount: 4500, category: 'daily', payerId: MEMBER_ZHOU, date: dateKey(addDays(now, -4)), splitMode: 'equal', createdAt: toISO(addDays(now, -4)), createdBy: MEMBER_ZHOU, supplyId: 'su-tissue' },
     { id: 'e-broadband', houseId: HOUSE_ID, title: '宽带月费', amount: 12000, category: 'internet', payerId: MEMBER_XIA, date: dateKey(addDays(now, -11)), splitMode: 'equal', createdAt: toISO(addDays(now, -11)), createdBy: MEMBER_XIA },
   ]
 
@@ -159,6 +160,10 @@ export function createSeedData(): AppData {
     { id: 'a3', houseId: HOUSE_ID, actorId: MEMBER_ZHOU, type: 'supply_restocked', targetId: 'su-tissue', summary: '登记了公共物品：抽纸', at: toISO(addDays(now, -4)) },
   ]
 
+  const swapRequests: SwapRequest[] = [
+    { id: 'sw-1', taskId: 'c-bathroom', fromId: MEMBER_ZHOU, toId: MEMBER_LIN, status: 'pending', createdAt: toISO(addDays(now, -0.2)) },
+  ]
+
   return {
     house,
     members,
@@ -166,6 +171,7 @@ export function createSeedData(): AppData {
     shares,
     choreRules,
     choreTasks: chores,
+    swapRequests,
     supplies,
     purchases: [],
     agreements,
@@ -184,6 +190,7 @@ export interface AppState extends AppData {
   completeChore: (taskId: ID) => void
   generateNextWeek: () => void
   swapChore: (taskId: ID, withMemberId: ID) => void
+  respondSwapRequest: (requestId: ID, accept: boolean) => void
   assignChoreTask: (area: ChoreArea, date: string) => void
   deleteChoreTask: (taskId: ID) => void
   remindChore: (taskId: ID) => void
@@ -389,21 +396,71 @@ export const useStore = create<AppState>()(
         set((state) => {
           const task = state.choreTasks.find((c) => c.id === taskId)
           if (!task || task.assigneeId === withMemberId) return {}
-          const now = new Date().toISOString()
+          if (task.assigneeId !== state.currentUserId) return {}
+          if (state.swapRequests.some((r) => r.taskId === taskId && r.status === 'pending')) return {}
           const target = state.members.find((m) => m.id === withMemberId)
-          const choreTasks = state.choreTasks.map((c) =>
-            c.id === taskId ? { ...c, assigneeId: withMemberId, swappedFromId: task.assigneeId } : c,
-          )
+          const now = new Date().toISOString()
+          const request: SwapRequest = {
+            id: uid('sw'),
+            taskId,
+            fromId: state.currentUserId,
+            toId: withMemberId,
+            status: 'pending',
+            createdAt: now,
+          }
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
             actorId: state.currentUserId,
             type: 'chore_swapped',
             targetId: taskId,
-            summary: `将${task.title}换给了${target?.name ?? '室友'}`,
+            summary: `向${target?.name ?? '室友'}发起了换班邀请（${task.title}）`,
             at: now,
+            notifyId: withMemberId,
           }
-          return { choreTasks, activities: [activity, ...state.activities] }
+          return { swapRequests: [...state.swapRequests, request], activities: [activity, ...state.activities] }
+        })
+      },
+      respondSwapRequest: (requestId, accept) => {
+        set((state) => {
+          const request = state.swapRequests.find((r) => r.id === requestId)
+          if (!request || request.status !== 'pending') return {}
+          if (request.toId !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const task = state.choreTasks.find((c) => c.id === request.taskId)
+          const from = state.members.find((m) => m.id === request.fromId)
+          const swapRequests = state.swapRequests.map((r) =>
+            r.id === requestId ? { ...r, status: accept ? ('accepted' as const) : ('rejected' as const) } : r,
+          )
+          let choreTasks = state.choreTasks
+          let activity: ActivityEvent
+          if (accept && task) {
+            choreTasks = state.choreTasks.map((c) =>
+              c.id === request.taskId ? { ...c, assigneeId: request.toId, swappedFromId: request.fromId } : c,
+            )
+            activity = {
+              id: uid('a'),
+              houseId: state.house.id,
+              actorId: state.currentUserId,
+              type: 'chore_swapped',
+              targetId: request.taskId,
+              summary: `同意换班，「${task.title}」已换给${state.members.find((m) => m.id === request.toId)?.name ?? '对方'}`,
+              at: now,
+              notifyId: request.fromId,
+            }
+          } else {
+            activity = {
+              id: uid('a'),
+              houseId: state.house.id,
+              actorId: state.currentUserId,
+              type: 'chore_swapped',
+              targetId: request.taskId,
+              summary: `拒绝了${from?.name ?? '对方'}的换班邀请`,
+              at: now,
+              notifyId: request.fromId,
+            }
+          }
+          return { swapRequests, choreTasks, activities: [activity, ...state.activities] }
         })
       },
       assignChoreTask: (area, date) => {
@@ -540,18 +597,21 @@ export const useStore = create<AppState>()(
           if (!supply) return {}
           if (supply.createdBy !== state.currentUserId) return {}
           const now = new Date().toISOString()
+          const linkedExpenseIds = state.expenses.filter((e) => e.supplyId === supplyId).map((e) => e.id)
           const activity: ActivityEvent = {
             id: uid('a'),
             houseId: state.house.id,
             actorId: state.currentUserId,
             type: 'supply_restocked',
             targetId: supplyId,
-            summary: `移除了公共物品「${supply.name}」`,
+            summary: `移除了公共物品「${supply.name}」及其账单`,
             at: now,
           }
           return {
             supplies: state.supplies.filter((s) => s.id !== supplyId),
             purchases: state.purchases.filter((p) => p.supplyId !== supplyId),
+            expenses: state.expenses.filter((e) => e.supplyId !== supplyId),
+            shares: state.shares.filter((s) => !linkedExpenseIds.includes(s.expenseId)),
             activities: [activity, ...state.activities],
           }
         })
@@ -691,7 +751,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'cohome:store',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         house: state.house,
@@ -700,6 +760,7 @@ export const useStore = create<AppState>()(
         shares: state.shares,
         choreRules: state.choreRules,
         choreTasks: state.choreTasks,
+        swapRequests: state.swapRequests,
         supplies: state.supplies,
         purchases: state.purchases,
         agreements: state.agreements,

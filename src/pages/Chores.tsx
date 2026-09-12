@@ -13,6 +13,7 @@ import {
   getMember,
   getSelf,
   myChoreToday,
+  timeAgo,
   weekRangeLabel,
 } from '../lib/selectors'
 import { useStore } from '../lib/store'
@@ -53,8 +54,8 @@ function SwapModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) 
       </div>
       <div className="modal__footer">
         <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
-        <button className="button button--primary" type="button" disabled={!target} onClick={() => { store.swapChore(task.id, target!); onClose() }}>
-          <Repeat2 size={15} /> 确认换班
+        <button className="button button--primary" type="button" disabled={!target} onClick={() => { store.swapChore(task.id, target!); notify('已发送换班邀请，等待对方回应'); onClose() }}>
+          <Repeat2 size={15} /> 发送邀请
         </button>
       </div>
     </Modal>
@@ -116,6 +117,8 @@ export function Chores() {
 
   const myToday = self ? myChoreToday(store, self.id) : undefined
   const myStage = myToday ? choreReminderStage(myToday) : null
+  const myIncoming = store.swapRequests.filter((r) => r.toId === selfId && r.status === 'pending')
+  const myOutgoing = store.swapRequests.filter((r) => r.fromId === selfId && r.status === 'pending')
 
   useEffect(() => {
     if (!self) return
@@ -171,6 +174,40 @@ export function Chores() {
         </section>
       )}
 
+      {(myIncoming.length > 0 || myOutgoing.length > 0) && (
+        <section className="panel module-panel">
+          <div className="panel__header"><div><h2>换班邀请</h2><p>换班需对方同意才会生效</p></div></div>
+          <div className="swap-request-list">
+            {myIncoming.map((r) => {
+              const task = store.choreTasks.find((c) => c.id === r.taskId)
+              const from = getMember(store, r.fromId)
+              return (
+                <div className="swap-request" key={r.id}>
+                  <div className="swap-request__main">
+                    <strong>{from?.name} 想将「{task?.title ?? '值日任务'}」换给你</strong>
+                    <span>{timeAgo(r.createdAt)}</span>
+                  </div>
+                  <button className="button button--secondary" type="button" onClick={() => { store.respondSwapRequest(r.id, false); notify('已拒绝换班邀请') }}>拒绝</button>
+                  <button className="button button--primary" type="button" onClick={() => { store.respondSwapRequest(r.id, true); notify('已接受换班，任务归你了') }}>接受</button>
+                </div>
+              )
+            })}
+            {myOutgoing.map((r) => {
+              const task = store.choreTasks.find((c) => c.id === r.taskId)
+              const to = getMember(store, r.toId)
+              return (
+                <div className="swap-request" key={r.id}>
+                  <div className="swap-request__main">
+                    <strong>「{task?.title ?? '值日任务'}」已向 {to?.name} 发出换班邀请</strong>
+                    <span>等待对方回应 · {timeAgo(r.createdAt)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="schedule-summary">
         <div>
           <span className="schedule-icon"><CalendarDays size={24} /></span>
@@ -192,6 +229,7 @@ export function Chores() {
             const isDone = item.status === 'done'
             const overdue = isOverdue(item)
             const isMine = item.assigneeId === selfId
+            const hasPendingSwap = store.swapRequests.some((r) => r.taskId === item.id && r.status === 'pending')
             return (
               <article className={`chore-card ${isDone ? 'is-done' : ''}`} key={item.id}>
                 <div className="chore-card__date"><strong>{item.dayLabel}</strong><span>{item.date}</span></div>
@@ -205,7 +243,7 @@ export function Chores() {
                 ) : isMine ? (
                   <div className="chore-actions">
                     <button className="button button--ghost" type="button" aria-label="删除任务" onClick={() => handleDelete(item)}><Trash2 size={15} /></button>
-                    <button className="button button--secondary" type="button" onClick={() => setSwapTask(item)}><Repeat2 size={15} /> 换班</button>
+                    <button className="button button--secondary" type="button" disabled={hasPendingSwap} onClick={() => setSwapTask(item)}><Repeat2 size={15} /> {hasPendingSwap ? '邀请待回应' : '换班'}</button>
                     <button className="button button--primary" type="button" onClick={() => store.completeChore(item.id)}><Check size={15} /> 完成</button>
                   </div>
                 ) : (

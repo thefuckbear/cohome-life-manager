@@ -89,6 +89,17 @@ export interface ChoreTask {
   swappedFromId?: ID
 }
 
+export type SwapStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface SwapRequest {
+  id: ID
+  taskId: ID
+  fromId: ID
+  toId: ID
+  status: SwapStatus
+  createdAt: string
+}
+
 export interface Supply {
   id: ID
   houseId: ID
@@ -170,6 +181,7 @@ export interface AppData {
   shares: ExpenseShare[]
   choreRules: ChoreRule[]
   choreTasks: ChoreTask[]
+  swapRequests: SwapRequest[]
   supplies: Supply[]
   purchases: PurchaseLog[]
   agreements: Agreement[]

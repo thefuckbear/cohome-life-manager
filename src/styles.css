@@ -382,6 +382,12 @@ h1, h2, h3, p { margin: 0; }
 .detail-row__main span { margin-top: 2px; color: #a1a7a3; font-size: 8px; }
 
 .swap-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.swap-request-list { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+.swap-request { padding: 13px 15px; display: flex; align-items: center; gap: 10px; border: 1px solid #e8e7df; border-radius: 13px; background: #fff; }
+.swap-request__main { flex: 1; min-width: 0; }
+.swap-request__main strong, .swap-request__main span { display: block; }
+.swap-request__main strong { font-size: 11px; }
+.swap-request__main span { margin-top: 3px; color: #99a09b; font-size: 9px; }
 .swap-item { padding: 11px 13px; display: flex; align-items: center; gap: 10px; color: #57635c; border: 1px solid #e4e4dc; border-radius: 12px; background: white; cursor: pointer; font-size: 12px; font-weight: 600; }
 .swap-item input { accent-color: var(--green); }
 .swap-item.is-checked { color: var(--green-dark); border-color: #b9cdc1; background: var(--green-soft); }
