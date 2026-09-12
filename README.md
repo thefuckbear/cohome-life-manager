@@ -1,5 +1,6 @@
 # 合住 CoHome
 
+**已在Github Page部署上线，请访问：https://thefuckbear.github.io/cohome-life-manager/#/**
 面向年轻合租群体的最小可用 Web UI，覆盖费用 AA、清洁值日、公共物品和室友公约四个模块。
 
 ## 当前版本
