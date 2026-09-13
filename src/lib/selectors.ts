@@ -204,6 +204,14 @@ export interface NotificationItem {
   text: string
   sub: string
   at: string
+  route: string
+}
+
+const REMIND_ROUTE: Record<string, string> = {
+  expense_reminded: '/expenses',
+  chore_reminded: '/chores',
+  chore_swapped: '/chores',
+  agreement_reminded: '/agreements',
 }
 
 export function notificationsFor(state: AppData, memberId: ID): NotificationItem[] {
@@ -217,6 +225,7 @@ export function notificationsFor(state: AppData, memberId: ID): NotificationItem
       text: `${actor?.name ?? '室友'} 提醒了你`,
       sub: act.summary,
       at: act.at,
+      route: REMIND_ROUTE[act.type] ?? '/',
     })
   }
   for (const pending of pendingSharesFor(state, memberId)) {
@@ -226,6 +235,7 @@ export function notificationsFor(state: AppData, memberId: ID): NotificationItem
       text: `待支付「${pending.expense.title}」`,
       sub: `应付给 ${pending.payer?.name ?? '室友'} ¥${yuan(pending.share.amount)}`,
       at: pending.expense.createdAt,
+      route: '/expenses',
     })
   }
   const chore = myChoreToday(state, memberId)
@@ -236,6 +246,7 @@ export function notificationsFor(state: AppData, memberId: ID): NotificationItem
       text: `今天轮到你值日「${chore.title}」`,
       sub: '今晚 20:00 前完成',
       at: chore.dueAt,
+      route: '/chores',
     })
   }
   items.sort((a, b) => (a.at < b.at ? 1 : -1))

@@ -76,11 +76,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const goFor = (kind: string) => {
+  const goFor = (route: string) => {
     setShowNotif(false)
-    if (kind === 'settle') navigate('/expenses')
-    else if (kind === 'chore') navigate('/chores')
-    else navigate('/agreements')
+    navigate(route)
   }
 
   return (
@@ -160,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="form-label" style={{ color: '#99a09b' }}>暂无通知。室友提醒你、你有待结算、今天值日时，都会出现在这里。</p>
             )}
             {notifs.map((n) => (
-              <button key={n.id} className="notif-row" type="button" onClick={() => goFor(n.kind)}>
+              <button key={n.id} className="notif-row" type="button" onClick={() => goFor(n.route)}>
                 <span className={`notif-row__icon notif-row__icon--${n.kind}`}>
                   {n.kind === 'reminded' ? <BellRing size={16} /> : n.kind === 'settle' ? <ReceiptText size={16} /> : <CalendarDays size={16} />}
                 </span>
