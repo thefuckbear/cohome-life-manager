@@ -12,7 +12,7 @@ function RemindModal({ agreement, onClose }: { agreement: Agreement; onClose: ()
   const store = useStore()
   const self = getSelf(store)
   const [target, setTarget] = useState<ID | null>(null)
-  const candidates = store.members.filter((m) => m.id !== self?.id)
+  const candidates = store.members.filter((m) => m.houseId === store.currentHouseId && m.id !== self?.id)
 
   const submit = () => {
     if (!target) return
@@ -80,7 +80,7 @@ function ProposeModal({ onClose }: { onClose: () => void }) {
         <label className="form-label" htmlFor="ag-content">公约内容</label>
         <textarea id="ag-content" className="form-input" style={{ height: '88px', padding: '9px 11px', resize: 'vertical' }} value={content} placeholder="描述具体规则，越具体越少争议" onChange={(e) => { setContent(e.target.value); setError('') }} />
       </div>
-      <p className="form-label" style={{ color: '#7f8a83' }}>发起后需 {store.members.length} 位室友全部确认才会生效。</p>
+      <p className="form-label" style={{ color: '#7f8a83' }}>发起后需 {store.members.filter((m) => m.houseId === store.currentHouseId).length} 位室友全部确认才会生效。</p>
       {error && <p className="form-error">{error}</p>}
       <div className="modal__footer">
         <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
@@ -192,8 +192,8 @@ export function Agreements() {
 
       <section className="agreement-banner">
         <span className="agreement-banner__icon"><BookOpenCheck size={26} /></span>
-        <div><small>{store.house.name}公约</small><strong>已共同生活 128 天</strong><p>当前共有 {activeCount} 条有效公约{votingCount > 0 ? `，${votingCount} 条等待确认` : ''}。</p></div>
-        <div className="agreement-banner__members"><Users size={17} /><span>{store.members.length} / {store.members.length} 位成员</span></div>
+        <div><small>{store.houses.find((h) => h.id === store.currentHouseId)?.name ?? '合租屋'}公约</small><strong>已共同生活 128 天</strong><p>当前共有 {activeCount} 条有效公约{votingCount > 0 ? `，${votingCount} 条等待确认` : ''}。</p></div>
+        <div className="agreement-banner__members"><Users size={17} /><span>{store.members.filter((m) => m.houseId === store.currentHouseId).length} / {store.members.filter((m) => m.houseId === store.currentHouseId).length} 位成员</span></div>
       </section>
 
       <section className="panel module-panel">
@@ -213,7 +213,7 @@ export function Agreements() {
                   </div>
                   <h3>{item.title}</h3>
                   <p>{item.content}</p>
-                  <span>{count} / {store.members.length} 位室友已同意</span>
+                  <span>{count} / {store.members.filter((m) => m.houseId === store.currentHouseId).length} 位室友已同意</span>
                 </div>
                 <div className="chore-actions">
                   {isActive ? (
@@ -221,7 +221,7 @@ export function Agreements() {
                   ) : hasVoted ? (
                     <span className="tag tag--success"><Check size={13} /> 我已同意</span>
                   ) : (
-                    <button className="button button--primary" type="button" onClick={() => { store.voteAgreement(item.id, true); notify(`已同意「${item.title}」，还需 ${store.members.length - count - 1} 位室友确认`) }}><ThumbsUp size={15} /> 同意</button>
+                    <button className="button button--primary" type="button" onClick={() => { store.voteAgreement(item.id, true); notify(`已同意「${item.title}」，还需 ${store.members.filter((m) => m.houseId === store.currentHouseId).length - count - 1} 位室友确认`) }}><ThumbsUp size={15} /> 同意</button>
                   )}
                   <button className="button button--ghost" type="button" onClick={() => setHistoryAgreement(item)}><History size={15} /> 历史</button>
                   {item.createdBy === selfId && (

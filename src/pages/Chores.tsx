@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { BellRing, CalendarDays, Check, Plus, Repeat2, Trash2 } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
@@ -39,7 +39,7 @@ function isOverdue(task: ChoreTask) {
 function SwapModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) {
   const store = useStore()
   const [target, setTarget] = useState<ID | null>(null)
-  const others = store.members.filter((m) => m.id !== task.assigneeId)
+  const others = store.members.filter((m) => m.houseId === store.currentHouseId && m.id !== task.assigneeId)
 
   return (
     <Modal title="与谁换班" onClose={onClose}>
@@ -68,10 +68,11 @@ function ClaimModal({ onClose }: { onClose: () => void }) {
   const nextMonday = dateKey(addDaysLocal(currentMonday(), 7))
   const [area, setArea] = useState<ChoreArea>('kitchen')
   const [date, setDate] = useState(nextMonday)
+  const [time, setTime] = useState('20:00')
 
   const submit = () => {
-    store.assignChoreTask(area, date)
-    notify(`已认领 ${date} 的值日任务`)
+    store.assignChoreTask(area, date, time)
+    notify(`已认领 ${date} ${time} 的值日任务`)
     onClose()
   }
 
@@ -87,14 +88,20 @@ function ClaimModal({ onClose }: { onClose: () => void }) {
           </label>
         ))}
       </div>
-      <span className="form-label">值日日期</span>
-      <div className="form-field">
-        <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <span style={{ color: '#9aa09c', fontSize: 9 }}>默认下周，可自行调整</span>
+      <div className="form-row">
+        <div className="form-field">
+          <span className="form-label">值日日期</span>
+          <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <span className="form-label">截止时间</span>
+          <input className="form-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
       </div>
+      <p className="form-label" style={{ color: '#9aa09c' }}>默认下周；截止前 10 分钟会收到通知。</p>
       <div className="modal__footer">
         <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
-        <button className="button button--primary" type="button" disabled={!date} onClick={submit}><Plus size={15} /> 认领值日</button>
+        <button className="button button--primary" type="button" disabled={!date || !time} onClick={submit}><Plus size={15} /> 认领值日</button>
       </div>
     </div>
   )
@@ -148,20 +155,6 @@ export function Chores() {
   const myIncoming = store.swapRequests.filter((r) => r.toId === selfId && r.status === 'pending')
   const myOutgoing = store.swapRequests.filter((r) => r.fromId === selfId && r.status === 'pending')
   const choreCounts = choreCompletionCounts(store)
-
-  useEffect(() => {
-    if (!self) return
-    const chore = myChoreToday(useStore.getState(), self.id)
-    if (!chore || !('Notification' in window)) return
-    if (Notification.permission === 'granted') {
-      const stage = choreReminderStage(chore)
-      const title = stage === 'due-soon' ? '值日临近截止' : '今日值日提醒'
-      const body = stage === 'due-soon' ? `今晚 20:00 前完成「${chore.title}」` : `今天轮到你值日「${chore.title}」`
-      new Notification(title, { body })
-    } else if (Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-  }, [self])
 
   const handleDelete = (task: ChoreTask) => {
     if (window.confirm(`确定删除值日任务「${task.title}」吗？`)) {
@@ -254,7 +247,7 @@ export function Chores() {
         </div>
         <div className="chore-stats">
           <span className="chore-stats__label">本月完成</span>
-          {store.members.map((m) => (
+          {store.members.filter((m) => m.houseId === store.currentHouseId).map((m) => (
             <span key={m.id} className="chore-stat">
               <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
               <span>{m.name} · <strong>{choreCounts[m.id] ?? 0}</strong> 次</span>

@@ -33,7 +33,7 @@ button { color: inherit; }
 .brand strong, .brand span { display: block; }
 .brand strong { font-size: 19px; letter-spacing: .08em; line-height: 1.1; }
 .brand span { margin-top: 3px; color: #8a918c; font-size: 10px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
-.home-switcher { width: 100%; margin-top: 28px; padding: 11px; display: flex; align-items: center; gap: 10px; border: 1px solid #e5e4da; background: white; border-radius: 14px; cursor: pointer; text-align: left; }
+.home-switcher { position: relative; width: 100%; margin-top: 28px; padding: 11px; display: flex; align-items: center; gap: 10px; border: 1px solid #e5e4da; background: white; border-radius: 14px; cursor: pointer; text-align: left; }
 .home-switcher:hover { border-color: #bfcfc5; }
 .home-switcher__icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--green-soft); color: var(--green); }
 .home-switcher > span:nth-child(2) { flex: 1; min-width: 0; }
@@ -52,6 +52,8 @@ button { color: inherit; }
 .sidebar__status strong { font-size: 11px; }
 .sidebar__status span { margin-top: 3px; color: #7d8981; font-size: 9px; }
 .profile-mini { position: relative; margin-top: 17px; padding: 0 6px; display: flex; align-items: center; gap: 9px; }
+.profile-mini__switch { display: flex; align-items: center; gap: 3px; padding: 0; color: #8a928d; border: 0; background: transparent; cursor: pointer; font-size: 9px; font-weight: 600; white-space: nowrap; }
+.profile-mini__switch:hover { color: var(--green); }
 .account-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); padding: 8px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #e5e4da; border-radius: 14px; background: #fffefa; box-shadow: 0 16px 40px rgba(32, 45, 38, .16); z-index: 40; }
 .account-menu__caption { padding: 2px 8px 4px; color: #9aa09c; font-size: 8px; }
 .account-menu__item { padding: 8px 9px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; font-size: 11px; font-weight: 600; color: #57635c; }
@@ -160,7 +162,7 @@ h1, h2, h3, p { margin: 0; }
 
 .module-page { padding-bottom: 20px; }
 .module-heading { padding: 5px 0 24px; }
-.metric-row { margin-bottom: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.metric-row { margin-bottom: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .metric-card { min-height: 112px; padding: 19px; display: flex; align-items: flex-start; gap: 13px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 .metric-icon--orange { color: #bb6e34; background: var(--orange-soft); }
 .metric-icon--green { color: #4e7a64; background: #e5efe8; }

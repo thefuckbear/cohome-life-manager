@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   Home,
+  Plus,
   ReceiptText,
   Sparkles,
   Users,
@@ -17,8 +18,8 @@ import {
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Modal } from './Modal'
-import { NOTIFY_EVENT, PLACEHOLDER_EVENT, triggerPlaceholder } from '../lib/placeholder'
-import { getSelf, notificationsFor } from '../lib/selectors'
+import { NOTIFY_EVENT, PLACEHOLDER_EVENT, playNotificationSound, triggerPlaceholder } from '../lib/placeholder'
+import { getSelf, myChoreToday, notificationsFor } from '../lib/selectors'
 import { useStore } from '../lib/store'
 
 const navigation = [
@@ -42,6 +43,33 @@ function Brand() {
   )
 }
 
+function AddHouseModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+
+  const submit = () => {
+    if (!name.trim()) return setError('请填写合租屋名称')
+    store.addHouse(name.trim())
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <p className="form-label" style={{ color: '#7f8a83' }}>创建后自动切换过去，你将成为新合租屋的管理员。</p>
+      <div className="form-field">
+        <label className="form-label" htmlFor="house-name">合租屋名称</label>
+        <input id="house-name" className="form-input" value={name} placeholder="例如：朝阳小窝" onChange={(e) => { setName(e.target.value); setError('') }} />
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><Plus size={15} /> 创建合租屋</button>
+      </div>
+    </div>
+  )
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const store = useStore()
@@ -49,8 +77,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ text: string; kind: 'placeholder' | 'notify' } | null>(null)
   const [showAccountMenu, setShowAccountMenu] = useState(false)
   const [showNotif, setShowNotif] = useState(false)
+  const [showHouseMenu, setShowHouseMenu] = useState(false)
+  const [showAddHouse, setShowAddHouse] = useState(false)
 
   const notifs = notificationsFor(store, store.currentUserId)
+  const currentHouse = store.houses.find((h) => h.id === store.currentHouseId)
 
   useEffect(() => {
     let timer = 0
@@ -81,14 +112,57 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate(route)
   }
 
+  useEffect(() => {
+    if (!self) return
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    const notified = new Set<string>()
+    const check = () => {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+      const chore = myChoreToday(useStore.getState(), self.id)
+      if (!chore) return
+      const due = new Date(chore.dueAt).getTime()
+      const left = due - Date.now()
+      if (left <= 10 * 60_000 && left > 0 && !notified.has(chore.id)) {
+        notified.add(chore.id)
+        new Notification('值日临近截止', { body: `「${chore.title}」将在 10 分钟内截止` })
+        playNotificationSound()
+      }
+    }
+    check()
+    const timer = window.setInterval(check, 60_000)
+    return () => window.clearInterval(timer)
+  }, [self])
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <Brand />
-        <button className="home-switcher" type="button" onClick={() => triggerPlaceholder('切换合租屋')}>
+        <button className="home-switcher" type="button" onClick={() => setShowHouseMenu((v) => !v)}>
           <span className="home-switcher__icon"><Users size={17} /></span>
-          <span><small>当前合租屋</small><strong>小满之家</strong></span>
+          <span><small>当前合租屋</small><strong>{currentHouse?.name ?? '合租屋'}</strong></span>
           <ChevronDown size={16} />
+          {showHouseMenu && (
+            <div className="account-menu">
+              <span className="account-menu__caption">我的合租屋</span>
+              {store.houses.map((h) => (
+                <button
+                  key={h.id}
+                  className={`account-menu__item${h.id === store.currentHouseId ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() => { store.switchHouse(h.id); setShowHouseMenu(false) }}
+                >
+                  <span className="home-switcher__icon" style={{ width: 26, height: 26, fontSize: 13 }}>🏠</span>
+                  <span>{h.name}{h.id === store.currentHouseId ? '（当前）' : ''}</span>
+                </button>
+              ))}
+              <button className="account-menu__item" type="button" onClick={() => { setShowAddHouse(true); setShowHouseMenu(false) }}>
+                <span className="home-switcher__icon" style={{ width: 26, height: 26, fontSize: 13 }}>＋</span>
+                <span>添加合租屋</span>
+              </button>
+            </div>
+          )}
         </button>
         <nav className="sidebar__nav" aria-label="主导航">
           <span className="nav-caption">生活管理</span>
@@ -106,11 +180,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="profile-mini">
           <span className="avatar" style={{ background: self?.color }}>{self?.initials}</span>
           <div><strong>{self?.name ?? '访客'}</strong><span>{self?.role === 'owner' ? '管理员' : '普通成员'}</span></div>
-          <button aria-label="切换账号" onClick={() => setShowAccountMenu((v) => !v)}><ChevronDown size={16} /></button>
+          <button className="profile-mini__switch" aria-label="切换账号" onClick={() => setShowAccountMenu((v) => !v)}>切换账号 <ChevronDown size={13} /></button>
           {showAccountMenu && (
             <div className="account-menu">
               <span className="account-menu__caption">切换账号（演示多成员视角）</span>
-              {store.members.map((m) => (
+              {Array.from(new Map(store.members.map((m) => [m.id, m])).values()).map((m) => (
                 <button
                   key={m.id}
                   className={`account-menu__item${m.id === store.currentUserId ? ' is-active' : ''}`}
@@ -136,7 +210,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <div className="topbar__profile">
             <span className="avatar" style={{ background: self?.color }}>{self?.initials}</span>
-            <div><strong>{self?.name}</strong><span>小满之家</span></div>
+            <div><strong>{self?.name}</strong><span>{currentHouse?.name ?? '合租屋'}</span></div>
           </div>
         </header>
         <main className="content">{children}</main>
@@ -170,6 +244,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             ))}
           </div>
+        </Modal>
+      )}
+      {showAddHouse && (
+        <Modal title="添加合租屋" onClose={() => setShowAddHouse(false)}>
+          <AddHouseModal onClose={() => setShowAddHouse(false)} />
         </Modal>
       )}
 

@@ -1,4 +1,5 @@
 export type ID = string
+/** 金额单位：元（浮点数；显示用 toFixed(2)，计算用 round2 控制精度） */
 export type Money = number
 
 export type SplitMode = 'equal' | 'custom' | 'ratio'
@@ -32,6 +33,7 @@ export interface Member {
   role: 'owner' | 'member'
   joinedAt: string
   status: '在家' | '外出'
+  balance: Money
 }
 
 export interface Expense {
@@ -51,6 +53,7 @@ export interface Expense {
 
 export interface ExpenseShare {
   id: ID
+  houseId: ID
   expenseId: ID
   memberId: ID
   amount: Money
@@ -114,6 +117,7 @@ export interface Supply {
 
 export interface PurchaseLog {
   id: ID
+  houseId: ID
   supplyId: ID
   buyerId: ID
   price: Money
@@ -150,6 +154,7 @@ export interface Agreement {
 
 export interface AgreementVote {
   id: ID
+  houseId: ID
   agreementId: ID
   memberId: ID
   agree: boolean
@@ -158,6 +163,7 @@ export interface AgreementVote {
 
 export interface AgreementVersion {
   id: ID
+  houseId: ID
   agreementId: ID
   title: string
   content: string
@@ -198,7 +204,8 @@ export interface SplitRule {
 }
 
 export interface AppData {
-  house: House
+  houses: House[]
+  currentHouseId: ID
   members: Member[]
   expenses: Expense[]
   shares: ExpenseShare[]

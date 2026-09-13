@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Box, PackageCheck, Plus, ReceiptText, Trash2 } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
-import { getMember, timeAgo, yuan } from '../lib/selectors'
+import { getMember, round2, timeAgo, yuan } from '../lib/selectors'
 import { useStore } from '../lib/store'
 import type { Supply } from '../lib/types'
 
@@ -18,7 +18,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
 
   const submit = () => {
     if (!name.trim()) return setError('请填写物品名称')
-    const price = Math.round(parseFloat(priceYuan || '0') * 100)
+    const price = round2(parseFloat(priceYuan || '0'))
     if (!(price > 0)) return setError('请填写正确的购买金额')
     store.registerSupply(name.trim(), emoji || '📦', category, price)
     notify(`已登记「${name.trim()}」为公共物品，并生成 AA 账单`)

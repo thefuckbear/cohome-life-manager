@@ -46,7 +46,7 @@ function AddMemberModal({ onClose }: { onClose: () => void }) {
   const submit = () => {
     if (!name.trim()) return setError('请填写室友名字')
     store.addMember(name.trim())
-    notify(`已邀请 ${name.trim()} 加入${store.house.name}`)
+    notify(`已邀请 ${name.trim()} 加入${store.houses.find((h) => h.id === store.currentHouseId)?.name ?? '合租屋'}`)
     onClose()
   }
 
@@ -134,7 +134,7 @@ export function Dashboard() {
         <div>
           <span className="eyebrow">{todayLabel()}</span>
           <h1>{greeting()}，{self?.name ?? '室友'} <span>👋</span></h1>
-          <p>{store.house.name}今天很平静，还有 {tasks.length} 件小事等你处理。</p>
+          <p>{store.houses.find((h) => h.id === store.currentHouseId)?.name ?? '合租屋'}今天很平静，还有 {tasks.length} 件小事等你处理。</p>
         </div>
         <div className="welcome-actions">
           <button className="button button--secondary" type="button" onClick={handleReset}><RotateCcw size={15} /> 重置演示数据</button>
@@ -209,9 +209,9 @@ export function Dashboard() {
 
         <aside className="dashboard-aside">
           <section className="panel roommates-panel">
-            <div className="panel__header"><div><h2>室友状态</h2><p>{store.house.name} · {store.members.length} 人</p></div></div>
+            <div className="panel__header"><div><h2>室友状态</h2><p>{store.houses.find((h) => h.id === store.currentHouseId)?.name ?? '合租屋'} · {store.members.filter((m) => m.houseId === store.currentHouseId).length} 人</p></div></div>
             <div className="roommate-list">
-              {store.members.map((member) => (
+              {store.members.filter((m) => m.houseId === store.currentHouseId).map((member) => (
                 <div className="roommate" key={member.id}>
                   <span className="avatar" style={{ background: member.color }}>{member.initials}</span>
                   <div><strong>{member.name}{member.id === store.currentUserId && <em>我</em>}</strong><span>{member.status}</span></div>

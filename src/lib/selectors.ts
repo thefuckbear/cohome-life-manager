@@ -11,20 +11,32 @@ import type {
   Money,
 } from './types'
 
+/** 浮点金额保留两位小数（分精度），所有金额出入口都过一遍 */
+export function round2(x: number): number {
+  return Math.round((x + Number.EPSILON) * 100) / 100
+}
+
+/** 按当前合租屋过滤实体集合（多合租屋支持） */
+function scoped<T extends { houseId: ID }>(state: AppData, list: T[]): T[] {
+  const hid = state.currentHouseId
+  return list.filter((x) => x.houseId === hid)
+}
+
 export function getSelf(state: AppData): Member | undefined {
-  return state.members.find((m) => m.id === state.currentUserId)
+  return scoped(state, state.members).find((m) => m.id === state.currentUserId)
 }
 
 export function getMember(state: AppData, id: ID): Member | undefined {
-  return state.members.find((m) => m.id === id)
+  return scoped(state, state.members).find((m) => m.id === id)
 }
 
 export function getExpense(state: AppData, id: ID): Expense | undefined {
-  return state.expenses.find((e) => e.id === id)
+  return scoped(state, state.expenses).find((e) => e.id === id)
 }
 
-export function yuan(fen: Money): string {
-  return (fen / 100).toFixed(2)
+/** 金额格式化（入参单位为元）：yuan(45.8) -> "45.80" */
+export function yuan(money: Money): string {
+  return round2(money).toFixed(2)
 }
 
 export function timeAgo(iso: string): string {
@@ -74,14 +86,14 @@ export function todayLabel(date = new Date()): string {
 
 export function computeNetBalances(state: AppData): Record<ID, Money> {
   const net: Record<ID, Money> = {}
-  for (const m of state.members) net[m.id] = 0
-  for (const share of state.shares) {
+  for (const m of scoped(state, state.members)) net[m.id] = 0
+  for (const share of scoped(state, state.shares)) {
     if (share.settled) continue
     const expense = getExpense(state, share.expenseId)
     if (!expense) continue
     if (expense.payerId === share.memberId) continue
-    net[expense.payerId] += share.amount
-    net[share.memberId] -= share.amount
+    net[expense.payerId] = round2(net[expense.payerId] + share.amount)
+    net[share.memberId] = round2(net[share.memberId] - share.amount)
   }
   return net
 }
@@ -106,10 +118,10 @@ export function computeSettlements(state: AppData): Settlement[] {
   let i = 0
   let j = 0
   while (i < debtors.length && j < creditors.length) {
-    const amount = Math.min(debtors[i].amount, creditors[j].amount)
+    const amount = round2(Math.min(debtors[i].amount, creditors[j].amount))
     result.push({ from: debtors[i].id, to: creditors[j].id, amount })
-    debtors[i].amount -= amount
-    creditors[j].amount -= amount
+    debtors[i].amount = round2(debtors[i].amount - amount)
+    creditors[j].amount = round2(creditors[j].amount - amount)
     if (debtors[i].amount === 0) i += 1
     if (creditors[j].amount === 0) j += 1
   }
@@ -124,7 +136,7 @@ export interface PendingShare {
 
 export function pendingSharesFor(state: AppData, memberId: ID): PendingShare[] {
   const result: PendingShare[] = []
-  for (const share of state.shares) {
+  for (const share of scoped(state, state.shares)) {
     if (share.memberId !== memberId || share.settled) continue
     const expense = getExpense(state, share.expenseId)
     if (!expense) continue
@@ -143,7 +155,7 @@ export function payeesCountFor(state: AppData, memberId: ID): number {
 
 export function myChoreThisWeek(state: AppData, memberId: ID): ChoreTask | undefined {
   const weekOf = dateKey(currentMonday())
-  return state.choreTasks.find(
+  return scoped(state, state.choreTasks).find(
     (c) => c.assigneeId === memberId && c.weekOf === weekOf && c.status === 'pending',
   )
 }
@@ -154,7 +166,7 @@ export function myChoreToday(state: AppData, memberId: ID): ChoreTask | undefine
   start.setHours(0, 0, 0, 0)
   const end = new Date(now)
   end.setHours(23, 59, 59, 999)
-  return state.choreTasks.find((c) => {
+  return scoped(state, state.choreTasks).find((c) => {
     if (c.assigneeId !== memberId || c.status !== 'pending') return false
     const due = new Date(c.dueAt).getTime()
     return due >= start.getTime() && due <= end.getTime()
@@ -163,15 +175,16 @@ export function myChoreToday(state: AppData, memberId: ID): ChoreTask | undefine
 
 export type ReminderStage = 'start' | 'due-soon'
 
+/** 截止前 10 分钟进入 due-soon 阶段 */
 export function choreReminderStage(task: ChoreTask, now = new Date()): ReminderStage {
   const due = new Date(task.dueAt).getTime()
-  const twoHoursBefore = due - 2 * 3_600_000
-  return now.getTime() >= twoHoursBefore ? 'due-soon' : 'start'
+  const tenMinutesBefore = due - 10 * 60_000
+  return now.getTime() >= tenMinutesBefore ? 'due-soon' : 'start'
 }
 
 export function choresThisWeek(state: AppData): ChoreTask[] {
   const weekOf = dateKey(currentMonday())
-  return state.choreTasks.filter((c) => c.weekOf === weekOf)
+  return scoped(state, state.choreTasks).filter((c) => c.weekOf === weekOf)
 }
 
 export function choresDoneCount(state: AppData): number {
@@ -180,7 +193,7 @@ export function choresDoneCount(state: AppData): number {
 
 export function nextWeekGenerated(state: AppData): boolean {
   const weekOf = dateKey(addDaysLocal(currentMonday(), 7))
-  return state.choreTasks.some((c) => c.weekOf === weekOf)
+  return scoped(state, state.choreTasks).some((c) => c.weekOf === weekOf)
 }
 
 export function weekRangeLabel(): { weekNumber: number; label: string } {
@@ -194,8 +207,9 @@ export function weekRangeLabel(): { weekNumber: number; label: string } {
 
 export function formatDue(dueAt: string): string {
   const due = new Date(dueAt)
-  const hours = `${due.getHours().toString().padStart(2, '0')}:00`
-  return `${hours} 前完成`
+  const h = due.getHours().toString().padStart(2, '0')
+  const m = due.getMinutes().toString().padStart(2, '0')
+  return `${h}:${m} 前完成`
 }
 
 export interface NotificationItem {
@@ -216,7 +230,7 @@ const REMIND_ROUTE: Record<string, string> = {
 
 export function notificationsFor(state: AppData, memberId: ID): NotificationItem[] {
   const items: NotificationItem[] = []
-  for (const act of state.activities) {
+  for (const act of scoped(state, state.activities)) {
     if (act.notifyId !== memberId) continue
     const actor = getMember(state, act.actorId)
     items.push({
@@ -244,7 +258,7 @@ export function notificationsFor(state: AppData, memberId: ID): NotificationItem
       id: `n-chore-${chore.id}`,
       kind: 'chore',
       text: `今天轮到你值日「${chore.title}」`,
-      sub: '今晚 20:00 前完成',
+      sub: `${formatDue(chore.dueAt)}`,
       at: chore.dueAt,
       route: '/chores',
     })
@@ -269,13 +283,13 @@ export function monthlySummary(state: AppData, now = new Date()): MonthlySummary
   let prevTotal = 0
   let count = 0
   const byCategory: Record<string, Money> = {}
-  for (const e of state.expenses) {
+  for (const e of scoped(state, state.expenses)) {
     if (e.date.startsWith(prefix)) {
-      total += e.amount
+      total = round2(total + e.amount)
       count += 1
-      byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount
+      byCategory[e.category] = round2((byCategory[e.category] ?? 0) + e.amount)
     } else if (e.date.startsWith(prevPrefix)) {
-      prevTotal += e.amount
+      prevTotal = round2(prevTotal + e.amount)
     }
   }
   return { total, count, byCategory, prevTotal }
@@ -289,7 +303,7 @@ export function daysLeft(bill: BillReminder, now = new Date()): number {
 }
 
 export function upcomingBills(state: AppData): BillReminder[] {
-  return state.billReminders
+  return scoped(state, state.billReminders)
     .filter((b) => !b.paid)
     .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))
 }
@@ -299,7 +313,7 @@ export function choreCompletionCounts(state: AppData, now = new Date()): Record<
   const m = now.getMonth()
   const prefix = `${y}-${String(m + 1).padStart(2, '0')}`
   const counts: Record<ID, number> = {}
-  for (const t of state.choreTasks) {
+  for (const t of scoped(state, state.choreTasks)) {
     if (t.status !== 'done' || !t.completedAt) continue
     const d = new Date(t.completedAt)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -311,10 +325,10 @@ export function choreCompletionCounts(state: AppData, now = new Date()): Record<
 }
 
 export function agreementAwaitingSelf(state: AppData, memberId: ID): Agreement | undefined {
-  return state.agreements.find(
+  return scoped(state, state.agreements).find(
     (a) =>
       a.status === 'voting' &&
-      !state.votes.some((v) => v.agreementId === a.id && v.memberId === memberId),
+      !scoped(state, state.votes).some((v) => v.agreementId === a.id && v.memberId === memberId),
   )
 }
 
@@ -332,20 +346,16 @@ export function buildShares(input: {
 }): SplitShare[] {
   const { amount, participants, payerId, splitMode, customAmounts } = input
   if (splitMode === 'custom' && customAmounts) {
-    return participants.map((pid) => ({ memberId: pid, amount: customAmounts[pid] ?? 0 }))
+    return participants.map((pid) => ({ memberId: pid, amount: round2(customAmounts[pid] ?? 0) }))
   }
   const n = participants.length
   if (n === 0) return []
-  const base = Math.floor(amount / n)
-  const remainder = amount - base * n
+  const base = round2(Math.floor((amount + Number.EPSILON) * 100 / n) / 100)
+  const remainder = round2(amount - base * n)
   return participants.map((pid) => ({
     memberId: pid,
-    amount: pid === payerId ? base + remainder : base,
+    amount: pid === payerId ? round2(base + remainder) : base,
   }))
-}
-
-export function yuanToFen(yuan: number): Money {
-  return Math.round(yuan * 100)
 }
 
 export interface MoneySummary {
@@ -356,9 +366,9 @@ export interface MoneySummary {
 export function payableFor(state: AppData, memberId: ID): MoneySummary {
   let total = 0
   let count = 0
-  for (const share of state.shares) {
+  for (const share of scoped(state, state.shares)) {
     if (share.memberId === memberId && !share.settled) {
-      total += share.amount
+      total = round2(total + share.amount)
       count += 1
     }
   }
@@ -368,11 +378,11 @@ export function payableFor(state: AppData, memberId: ID): MoneySummary {
 export function receivableFor(state: AppData, memberId: ID): MoneySummary {
   let total = 0
   let count = 0
-  for (const share of state.shares) {
+  for (const share of scoped(state, state.shares)) {
     if (share.settled || share.memberId === memberId) continue
     const expense = getExpense(state, share.expenseId)
     if (expense && expense.payerId === memberId) {
-      total += share.amount
+      total = round2(total + share.amount)
       count += 1
     }
   }
@@ -380,11 +390,11 @@ export function receivableFor(state: AppData, memberId: ID): MoneySummary {
 }
 
 export function expenseTotal(state: AppData): Money {
-  return state.expenses.reduce((sum, e) => sum + e.amount, 0)
+  return round2(scoped(state, state.expenses).reduce((sum, e) => sum + e.amount, 0))
 }
 
 export function expenseShares(state: AppData, expenseId: ID): ExpenseShare[] {
-  return state.shares.filter((s) => s.expenseId === expenseId)
+  return scoped(state, state.shares).filter((s) => s.expenseId === expenseId)
 }
 
 export interface ExpenseStatus {

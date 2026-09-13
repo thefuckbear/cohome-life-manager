@@ -10,6 +10,7 @@ import {
   ReceiptText,
   Settings2,
   Trash2,
+  Wallet,
   WalletCards,
 } from 'lucide-react'
 import { Modal } from '../components/Modal'
@@ -26,9 +27,9 @@ import {
   monthlySummary,
   payableFor,
   receivableFor,
+  round2,
   upcomingBills,
   yuan,
-  yuanToFen,
 } from '../lib/selectors'
 import { useStore } from '../lib/store'
 import type { Expense, ExpenseCategory, ID, SplitMode } from '../lib/types'
@@ -54,6 +55,7 @@ const ALL_CATEGORIES: (ExpenseCategory | 'all')[] = ['all', 'rent', 'utility', '
 function ExpenseForm({ onDone }: { onDone: () => void }) {
   const store = useStore()
   const self = getSelf(store)
+  const members = store.members.filter((m) => m.houseId === store.currentHouseId)
   const [title, setTitle] = useState('')
   const [amountYuan, setAmountYuan] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('utility')
@@ -61,13 +63,13 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
   const [date, setDate] = useState(dateKey(new Date()))
   const [splitMode, setSplitMode] = useState<SplitMode>(store.splitRule.mode === 'custom' ? 'custom' : 'equal')
   const defaultParticipants = store.splitRule.participantIds.length
-    ? store.splitRule.participantIds.filter((id) => store.members.some((m) => m.id === id))
-    : store.members.map((m) => m.id)
+    ? store.splitRule.participantIds.filter((id) => members.some((m) => m.id === id))
+    : members.map((m) => m.id)
   const [participants, setParticipants] = useState<ID[]>(defaultParticipants)
   const [customAmounts, setCustomAmounts] = useState<Record<ID, string>>({})
   const [error, setError] = useState('')
 
-  const total = yuanToFen(parseFloat(amountYuan || '0') || 0)
+  const total = round2(parseFloat(amountYuan || '0') || 0)
 
   const toggleParticipant = (id: ID) => {
     setError('')
@@ -83,7 +85,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
 
   const othersSum = participants
     .filter((p) => p !== payerId)
-    .reduce((sum, p) => sum + yuanToFen(parseFloat(customAmounts[p] || '0') || 0), 0)
+    .reduce((sum, p) => sum + round2(parseFloat(customAmounts[p] || '0') || 0), 0)
 
   const submit = () => {
     if (!title.trim()) return setError('请填写费用名称')
@@ -96,7 +98,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
     if (splitMode === 'custom') {
       customAmountsFinal = {}
       for (const p of participants) {
-        customAmountsFinal[p] = p === payerId ? total - othersSum : yuanToFen(parseFloat(customAmounts[p] || '0') || 0)
+        customAmountsFinal[p] = p === payerId ? total - othersSum : round2(parseFloat(customAmounts[p] || '0') || 0)
       }
     }
     store.addExpense({
@@ -136,7 +138,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
         <div className="form-field">
           <label className="form-label" htmlFor="expense-payer">付款人</label>
           <select id="expense-payer" className="form-select" value={payerId} onChange={(e) => setPayerId(e.target.value)}>
-            {store.members.map((m) => (
+            {members.map((m) => (
               <option key={m.id} value={m.id}>{m.name}{m.isSelf ? '（我）' : ''}</option>
             ))}
           </select>
@@ -164,7 +166,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
       <div className="form-field">
         <span className="form-label">参与分摊的室友</span>
         <div className="participant-list">
-          {store.members.map((m) => (
+          {members.map((m) => (
             <label key={m.id} className="participant-item">
               <input
                 type="checkbox"
@@ -183,7 +185,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
         <div className="form-field">
           <span className="form-label">每人金额（元，付款人自动补差）</span>
           <div className="custom-amounts">
-            {store.members
+            {members
               .filter((m) => participants.includes(m.id))
               .map((m) => {
                 const isPayer = m.id === payerId
@@ -218,7 +220,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
   )
 }
 
-function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => void }) {
+function ExpenseDetail({ expenseId, onClose, onNeedRecharge }: { expenseId: ID; onClose: () => void; onNeedRecharge: () => void }) {
   const store = useStore()
   const selfId = store.currentUserId
   const expense = store.expenses.find((e) => e.id === expenseId)
@@ -226,6 +228,16 @@ function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => v
   const payer = getMember(store, expense.payerId)
   const shares = expenseShares(store, expenseId)
   const myUnsettled = shares.find((s) => !s.settled && s.memberId === selfId)
+
+  const handleSettle = (shareId: ID) => {
+    const result = store.settleShare(expense.id, shareId)
+    if (result === 'insufficient') {
+      notify('余额不足，请先充值')
+      onNeedRecharge()
+    } else if (result === 'ok') {
+      notify('已结清')
+    }
+  }
 
   return (
     <div>
@@ -251,7 +263,7 @@ function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => v
               <span className={`tag ${s.settled ? 'tag--success' : 'tag--warm'}`}>{s.settled && <Check size={12} />}{s.settled ? '已结清' : '待结算'}</span>
               <strong>¥{yuan(s.amount)}</strong>
               {!s.settled && isMine && (
-                <button className="button button--ghost" type="button" onClick={() => store.settleShare(expense.id, s.id)}>
+                <button className="button button--ghost" type="button" onClick={() => handleSettle(s.id)}>
                   标记已结清
                 </button>
               )}
@@ -266,7 +278,7 @@ function ExpenseDetail({ expenseId, onClose }: { expenseId: ID; onClose: () => v
       </div>
       {myUnsettled && (
         <div className="modal__footer">
-          <button className="button button--primary button--full" type="button" onClick={() => store.settleShare(expense.id, myUnsettled.id)}>
+          <button className="button button--primary button--full" type="button" onClick={() => handleSettle(myUnsettled.id)}>
             结清我的这笔分摊
           </button>
         </div>
@@ -305,7 +317,7 @@ function SplitRuleModal({ onClose }: { onClose: () => void }) {
       </div>
       <span className="form-label">默认参与人（不勾选 = 全体成员）</span>
       <div className="participant-list">
-        {store.members.map((m) => (
+        {store.members.filter((m) => m.houseId === store.currentHouseId).map((m) => (
           <label key={m.id} className="participant-item">
             <input type="checkbox" checked={participantIds.includes(m.id)} onChange={() => toggleMember(m.id)} />
             <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
@@ -330,7 +342,7 @@ function BillModal({ onClose }: { onClose: () => void }) {
 
   const submit = () => {
     if (!title.trim()) return setError('请填写账单名称')
-    const amount = Math.round(parseFloat(amountYuan || '0') * 100)
+    const amount = round2(parseFloat(amountYuan || '0'))
     if (!(amount > 0)) return setError('请填写正确的金额')
     if (!dueDate) return setError('请选择截止日期')
     store.addBillReminder(title.trim(), amount, dueDate)
@@ -364,12 +376,43 @@ function BillModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function RechargeModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const self = getSelf(store)
+  const [amountYuan, setAmountYuan] = useState('')
+  const [error, setError] = useState('')
+
+  const submit = () => {
+    const amount = round2(parseFloat(amountYuan || '0'))
+    if (!(amount > 0)) return setError('请输入正确的充值金额')
+    store.recharge(amount)
+    notify(`已充值 ¥${amount.toFixed(2)}`)
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <p className="form-label">当前余额：¥{yuan(self?.balance ?? 0)}</p>
+      <div className="form-field">
+        <label className="form-label" htmlFor="recharge-amount">充值金额（元）</label>
+        <input id="recharge-amount" className="form-input" type="number" min="0" step="0.01" value={amountYuan} placeholder="0.00" onChange={(e) => { setAmountYuan(e.target.value); setError('') }} />
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><Wallet size={15} /> 确认充值</button>
+      </div>
+    </div>
+  )
+}
+
 export function Expenses() {
   const store = useStore()
   const self = getSelf(store)
   const selfId = self?.id ?? ''
   const [showForm, setShowForm] = useState(false)
   const [showRule, setShowRule] = useState(false)
+  const [showRecharge, setShowRecharge] = useState(false)
   const [detailId, setDetailId] = useState<ID | null>(null)
   const [filter, setFilter] = useState<ExpenseCategory | 'all'>('all')
   const [showBill, setShowBill] = useState(false)
@@ -388,7 +431,12 @@ export function Expenses() {
 
   const handleSettleAll = () => {
     if (window.confirm('确定结清我的所有待结算分摊吗？')) {
-      store.settleAll()
+      const result = store.settleAll()
+      if (result === 'none') notify('没有待结算的费用')
+      else if (result === 'insufficient') {
+        notify('余额不足，请先充值')
+        setShowRecharge(true)
+      }
     }
   }
 
@@ -409,7 +457,8 @@ export function Expenses() {
       <section className="metric-row">
         <article className="metric-card"><span className="metric-icon metric-icon--orange"><ArrowUpRight size={20} /></span><div><small>我需要支付</small><strong>¥{yuan(payable.total)}</strong><span>共 {payable.count} 笔待结算</span></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon--green"><ArrowDownLeft size={20} /></span><div><small>我将收到</small><strong>¥{yuan(receivable.total)}</strong><span>来自室友的待结算</span></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon--purple"><CircleDollarSign size={20} /></span><div><small>共同支出总额</small><strong>¥{yuan(total)}</strong><span>已记录 {store.expenses.length} 笔费用</span></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon--purple"><CircleDollarSign size={20} /></span><div><small>共同支出总额</small><strong>¥{yuan(total)}</strong><span>已记录 {store.expenses.filter((e) => e.houseId === store.currentHouseId).length} 笔费用</span></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon--green"><Wallet size={20} /></span><div><small>我的余额</small><strong>¥{yuan(self?.balance ?? 0)}</strong><button className="button button--ghost" type="button" style={{ padding: 0, minHeight: 24 }} onClick={() => setShowRecharge(true)}><Wallet size={12} /> 充值</button></div></article>
       </section>
 
       {settlements.length > 0 && (
@@ -533,12 +582,17 @@ export function Expenses() {
       )}
       {detailId && (
         <Modal title="费用明细" onClose={() => setDetailId(null)}>
-          <ExpenseDetail expenseId={detailId} onClose={() => setDetailId(null)} />
+          <ExpenseDetail expenseId={detailId} onClose={() => setDetailId(null)} onNeedRecharge={() => setShowRecharge(true)} />
         </Modal>
       )}
       {showBill && (
         <Modal title="登记缴费日" onClose={() => setShowBill(false)}>
           <BillModal onClose={() => setShowBill(false)} />
+        </Modal>
+      )}
+      {showRecharge && (
+        <Modal title="充值" onClose={() => setShowRecharge(false)}>
+          <RechargeModal onClose={() => setShowRecharge(false)} />
         </Modal>
       )}
     </div>
