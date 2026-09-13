@@ -49,7 +49,7 @@ function SwapModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) 
           <label key={m.id} className={`swap-item${target === m.id ? ' is-checked' : ''}`}>
             <input type="radio" name="swap-target" checked={target === m.id} onChange={() => setTarget(m.id)} />
             <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
-            <span>{m.name}{m.isSelf ? '（我）' : ''}</span>
+            <span>{m.name}{m.id === store.currentUserId ? '（我）' : ''}</span>
           </label>
         ))}
       </div>

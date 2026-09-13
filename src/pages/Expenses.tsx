@@ -136,12 +136,11 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           </select>
         </div>
         <div className="form-field">
-          <label className="form-label" htmlFor="expense-payer">付款人</label>
-          <select id="expense-payer" className="form-select" value={payerId} onChange={(e) => setPayerId(e.target.value)}>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}{m.isSelf ? '（我）' : ''}</option>
-            ))}
-          </select>
+          <span className="form-label">付款人</span>
+          <div className="payer-fixed">
+            <span className="avatar avatar--sm" style={{ background: self?.color }}>{self?.initials}</span>
+            <strong>{self?.name}（我）</strong>
+          </div>
         </div>
         <div className="form-field">
           <label className="form-label" htmlFor="expense-date">日期</label>

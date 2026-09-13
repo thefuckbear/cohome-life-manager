@@ -544,3 +544,120 @@ h1, h2, h3, p { margin: 0; }
   .detail-row .tag { grid-column: 2; }
   .detail-row .button { grid-column: 3; grid-row: 1 / 3; }
 }
+
+/* ============ 补全块（放在最末尾，确保覆盖所有原始定义） ============ */
+
+/* --- 记账表单：固定付款人 --- */
+.payer-fixed { display: flex; align-items: center; gap: 9px; height: 42px; }
+.payer-fixed strong { font-size: 14px; color: #57635c; }
+
+/* --- 字号放大补全（覆盖遗漏的类） --- */
+.brand span { font-size: 11px; }
+.sidebar__status strong { font-size: 12px; }
+.sidebar__status span { font-size: 10px; }
+.profile-mini div span { font-size: 10px; }
+.topbar__profile strong { font-size: 13px; }
+.topbar__profile span { font-size: 10px; }
+.text-button { font-size: 12px; }
+.summary-label { font-size: 12px; }
+.summary-note { font-size: 10px; }
+.tag { font-size: 11px; }
+.panel__header p { font-size: 11px; }
+.task-body strong { font-size: 12px; }
+.task-body span { font-size: 10px; }
+.quick-card strong { font-size: 12px; }
+.quick-card small { font-size: 10px; }
+.roommate strong { font-size: 12px; }
+.roommate strong em { font-size: 9px; }
+.roommate div span { font-size: 10px; }
+.activity p { font-size: 11px; }
+.activity div > span { font-size: 9px; }
+.metric-card small { font-size: 11px; }
+.metric-card div span { font-size: 10px; }
+.table-row__main span { font-size: 11px; }
+.empty-preview strong { font-size: 13px; }
+.empty-preview span { font-size: 10px; }
+.category-bar__label { font-size: 12px; }
+.guide-card li { font-size: 11px; }
+.settlement-arrow { font-size: 10px; }
+.schedule-summary small { font-size: 11px; }
+.progress-copy > span { font-size: 11px; }
+.chore-stats__label { font-size: 11px; }
+.chore-stat { font-size: 12px; }
+.chore-card__date span { font-size: 10px; }
+.chore-note { font-size: 9px; }
+.supply-category { font-size: 10px; }
+.supply-card__footer > span { font-size: 10px; }
+.supply-next > span:last-child { font-size: 11px; }
+.agreement-banner small { font-size: 10px; }
+.agreement-banner p { font-size: 10px; }
+.agreement-banner__members { font-size: 12px; }
+.agreement-copy > span { font-size: 10px; }
+.notif-row__go { font-size: 10px; }
+.version-row__meta { font-size: 9px; }
+.toast strong { font-size: 11px; }
+.toast span { font-size: 9px; }
+.form-label { font-size: 12px; }
+.form-error { font-size: 11px; }
+.detail-summary p { font-size: 10px; }
+.detail-row__main strong { font-size: 12px; }
+.detail-row__main span { font-size: 10px; }
+.swap-request__main strong { font-size: 12px; }
+.swap-request__main span { font-size: 10px; }
+.mobile-nav__item { font-size: 9px; }
+.theme-option small { font-size: 10px; }
+
+/* --- 深色主题：灰字调亮为亮白色 --- */
+[data-theme='dark'] .welcome-row p,
+[data-theme='dark'] .module-heading p,
+[data-theme='dark'] .panel__header p,
+[data-theme='dark'] .eyebrow,
+[data-theme='dark'] .table-row__main span,
+[data-theme='dark'] .task-body span,
+[data-theme='dark'] .roommate div span,
+[data-theme='dark'] .activity div > span,
+[data-theme='dark'] .agreement-copy p,
+[data-theme='dark'] .supply-category,
+[data-theme='dark'] .settlement-arrow,
+[data-theme='dark'] .chore-card__body small,
+[data-theme='dark'] .chore-card__date span,
+[data-theme='dark'] .detail-row__main span,
+[data-theme='dark'] .version-row__meta,
+[data-theme='dark'] .notif-row__main span,
+[data-theme='dark'] .metric-card small,
+[data-theme='dark'] .metric-card div span,
+[data-theme='dark'] .summary-label,
+[data-theme='dark'] .summary-note,
+[data-theme='dark'] .supply-card__footer > span,
+[data-theme='dark'] .supply-next > span:last-child,
+[data-theme='dark'] .form-label,
+[data-theme='dark'] .empty-preview span,
+[data-theme='dark'] .category-bar__label,
+[data-theme='dark'] .chore-stat,
+[data-theme='dark'] .chore-stats__label,
+[data-theme='dark'] .guide-card > p,
+[data-theme='dark'] .guide-card li,
+[data-theme='dark'] .profile-mini div span,
+[data-theme='dark'] .topbar__profile span,
+[data-theme='dark'] .sidebar__status span,
+[data-theme='dark'] .account-menu__caption,
+[data-theme='dark'] .agreement-copy > span,
+[data-theme='dark'] .swap-request__main span,
+[data-theme='dark'] .detail-summary p,
+[data-theme='dark'] .agreement-banner small,
+[data-theme='dark'] .agreement-banner p,
+[data-theme='dark'] .payer-fixed strong {
+  color: #c4cec8;
+}
+[data-theme='dark'] .brand span { color: #aeb9b2; }
+[data-theme='dark'] .nav-caption { color: #9aa59e; }
+[data-theme='dark'] .home-switcher small { color: #a8b2ac; }
+[data-theme='dark'] .profile-mini__switch { color: #aeb9b2; }
+[data-theme='dark'] .sidebar__status strong { color: #dbe4de; }
+[data-theme='dark'] .topbar__profile strong { color: #dbe4de; }
+[data-theme='dark'] .profile-mini strong { color: #dbe4de; }
+[data-theme='dark'] .activity p { color: #b4bfb8; }
+[data-theme='dark'] .activity p strong { color: #e8eeea; }
+[data-theme='dark'] .agreement-copy h3 { color: #e8eeea; }
+[data-theme='dark'] .detail-summary h3 { color: #e8eeea; }
+[data-theme='dark'] .version-row > p { color: #b4bfb8; }
