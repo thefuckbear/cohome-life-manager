@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   Bell,
   BellRing,
+  BookOpen,
   BookOpenCheck,
   Box,
   CalendarDays,
@@ -26,6 +27,7 @@ const navigation = [
   { to: '/chores', label: '清洁值日', icon: ClipboardCheck },
   { to: '/supplies', label: '公共物品', icon: Box },
   { to: '/agreements', label: '室友公约', icon: BookOpenCheck },
+  { to: '/guide', label: '使用说明', icon: BookOpen },
 ]
 
 function Brand() {

@@ -7,6 +7,7 @@ import type {
   Agreement,
   AgreementVote,
   AppData,
+  BillReminder,
   ChoreArea,
   ChoreRule,
   ChoreTask,
@@ -164,6 +165,12 @@ export function createSeedData(): AppData {
     { id: 'sw-1', taskId: 'c-bathroom', fromId: MEMBER_ZHOU, toId: MEMBER_LIN, status: 'pending', createdAt: toISO(addDays(now, -0.2)) },
   ]
 
+  const billReminders: BillReminder[] = [
+    { id: 'b-rent', houseId: HOUSE_ID, title: '房租', amount: 300000, dueDate: dateKey(new Date(now.getFullYear(), now.getMonth(), 25)), createdBy: MEMBER_XIA, createdAt: toISO(addDays(now, -30)), paid: false },
+    { id: 'b-water', houseId: HOUSE_ID, title: '水费', amount: 8650, dueDate: dateKey(addDays(now, -2)), createdBy: MEMBER_LIN, createdAt: toISO(addDays(now, -15)), paid: false },
+    { id: 'b-net', houseId: HOUSE_ID, title: '宽带费', amount: 12000, dueDate: dateKey(addDays(now, 3)), createdBy: MEMBER_ZHOU, createdAt: toISO(addDays(now, -10)), paid: false },
+  ]
+
   return {
     house,
     members,
@@ -174,6 +181,7 @@ export function createSeedData(): AppData {
     swapRequests,
     supplies,
     purchases: [],
+    billReminders,
     agreements,
     votes,
     activities,
@@ -203,6 +211,10 @@ export interface AppState extends AppData {
   addMember: (name: string) => void
   switchAccount: (memberId: ID) => void
   saveSplitRule: (rule: SplitRule) => void
+  remindExpense: (expenseId: ID, memberId: ID) => void
+  addBillReminder: (title: string, amount: Money, dueDate: string) => void
+  deleteBillReminder: (billId: ID) => void
+  markBillPaid: (billId: ID) => void
   reset: () => void
 }
 
@@ -747,11 +759,84 @@ export const useStore = create<AppState>()(
       saveSplitRule: (rule) => {
         set({ splitRule: rule })
       },
+      remindExpense: (expenseId, memberId) => {
+        set((state) => {
+          const expense = state.expenses.find((e) => e.id === expenseId)
+          const share = state.shares.find((s) => s.expenseId === expenseId && s.memberId === memberId && !s.settled)
+          if (!expense || !share) return {}
+          const target = state.members.find((m) => m.id === memberId)
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'expense_reminded',
+            targetId: expenseId,
+            summary: `催${target?.name ?? '室友'}结清「${expense.title}」的 ¥${(share.amount / 100).toFixed(2)}`,
+            at: now,
+            notifyId: memberId,
+          }
+          return { activities: [activity, ...state.activities] }
+        })
+      },
+      addBillReminder: (title, amount, dueDate) => {
+        set((state) => {
+          const now = new Date().toISOString()
+          const bill: BillReminder = {
+            id: uid('b'),
+            houseId: state.house.id,
+            title,
+            amount,
+            dueDate,
+            createdBy: state.currentUserId,
+            createdAt: now,
+            paid: false,
+          }
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'expense_added',
+            targetId: bill.id,
+            summary: `登记了缴费日「${title}」`,
+            at: now,
+          }
+          return { billReminders: [...state.billReminders, bill], activities: [activity, ...state.activities] }
+        })
+      },
+      deleteBillReminder: (billId) => {
+        set((state) => {
+          const bill = state.billReminders.find((b) => b.id === billId)
+          if (!bill) return {}
+          if (bill.createdBy !== state.currentUserId) return {}
+          return { billReminders: state.billReminders.filter((b) => b.id !== billId) }
+        })
+      },
+      markBillPaid: (billId) => {
+        set((state) => {
+          const bill = state.billReminders.find((b) => b.id === billId)
+          if (!bill || bill.paid) return {}
+          const now = new Date().toISOString()
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'expense_settled',
+            targetId: billId,
+            summary: `标记「${bill.title}」已缴费`,
+            at: now,
+          }
+          return {
+            billReminders: state.billReminders.map((b) => (b.id === billId ? { ...b, paid: true } : b)),
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
       reset: () => set({ ...createSeedData() }),
     }),
     {
       name: 'cohome:store',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         house: state.house,
@@ -763,6 +848,7 @@ export const useStore = create<AppState>()(
         swapRequests: state.swapRequests,
         supplies: state.supplies,
         purchases: state.purchases,
+        billReminders: state.billReminders,
         agreements: state.agreements,
         votes: state.votes,
         activities: state.activities,

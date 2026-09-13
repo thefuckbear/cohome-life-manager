@@ -17,6 +17,7 @@ import { notify } from '../lib/placeholder'
 import {
   agreementAwaitingSelf,
   computeNetBalances,
+  daysLeft,
   getMember,
   getSelf,
   greeting,
@@ -26,6 +27,7 @@ import {
   pendingSharesFor,
   timeAgo,
   todayLabel,
+  upcomingBills,
   yuan,
 } from '../lib/selectors'
 import { useStore } from '../lib/store'
@@ -97,6 +99,17 @@ export function Dashboard() {
       tagClass: 'tag--warm',
     })
   }
+  const dueBill = upcomingBills(store).find((b) => daysLeft(b) <= 3)
+  if (dueBill) {
+    const left = daysLeft(dueBill)
+    tasks.push({
+      key: `bill-${dueBill.id}`,
+      title: `${dueBill.title}缴费${left < 0 ? '已逾期' : '临近'}`,
+      sub: `${dueBill.dueDate} 截止 · ¥${yuan(dueBill.amount)}`,
+      tag: '缴费',
+      tagClass: left < 0 ? 'tag--danger' : 'tag--warm',
+    })
+  }
   if (pendingAgreement) {
     const creator = getMember(store, pendingAgreement.createdBy)
     tasks.push({
@@ -165,8 +178,8 @@ export function Dashboard() {
                   <button className="task-check" onClick={() => console.info('[合住 CoHome] 标记任务完成功能预留')} aria-label="标记完成"><Check size={15} /></button>
                   <div className="task-body"><strong>{task.title}</strong><span>{task.sub}</span></div>
                   <span className={`tag ${task.tagClass}`}>{task.tag}</span>
-                  {task.key.startsWith('pay-') ? (
-                    <button className="button button--ghost" onClick={() => navigate('/expenses')}>去支付</button>
+                  {task.key.startsWith('pay-') || task.key.startsWith('bill-') ? (
+                    <button className="button button--ghost" onClick={() => navigate('/expenses')}>{task.key.startsWith('bill-') ? '去处理' : '去支付'}</button>
                   ) : task.key.startsWith('agree-') ? (
                     <button className="button button--ghost" onClick={() => navigate('/agreements')}>去看看</button>
                   ) : (

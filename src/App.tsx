@@ -4,6 +4,7 @@ import { Agreements } from './pages/Agreements'
 import { Chores } from './pages/Chores'
 import { Dashboard } from './pages/Dashboard'
 import { Expenses } from './pages/Expenses'
+import { Guide } from './pages/Guide'
 import { Supplies } from './pages/Supplies'
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/chores" element={<Chores />} />
         <Route path="/supplies" element={<Supplies />} />
         <Route path="/agreements" element={<Agreements />} />
+        <Route path="/guide" element={<Guide />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

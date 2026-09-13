@@ -120,6 +120,17 @@ export interface PurchaseLog {
   expenseId?: ID
 }
 
+export interface BillReminder {
+  id: ID
+  houseId: ID
+  title: string
+  amount: Money
+  dueDate: string
+  createdBy: ID
+  createdAt: string
+  paid: boolean
+}
+
 export type AgreementStatus = 'draft' | 'voting' | 'active' | 'archived'
 
 export interface Agreement {
@@ -157,6 +168,7 @@ export type ActivityType =
   | 'agreement_proposed'
   | 'chore_reminded'
   | 'member_added'
+  | 'expense_reminded'
 
 export interface ActivityEvent {
   id: ID
@@ -184,6 +196,7 @@ export interface AppData {
   swapRequests: SwapRequest[]
   supplies: Supply[]
   purchases: PurchaseLog[]
+  billReminders: BillReminder[]
   agreements: Agreement[]
   votes: AgreementVote[]
   activities: ActivityEvent[]

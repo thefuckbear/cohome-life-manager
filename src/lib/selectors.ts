@@ -2,6 +2,7 @@ import type {
   AddExpenseInput,
   Agreement,
   AppData,
+  BillReminder,
   ChoreTask,
   Expense,
   ExpenseShare,
@@ -239,6 +240,47 @@ export function notificationsFor(state: AppData, memberId: ID): NotificationItem
   }
   items.sort((a, b) => (a.at < b.at ? 1 : -1))
   return items
+}
+
+export interface MonthlySummary {
+  total: Money
+  count: number
+  byCategory: Record<string, Money>
+  prevTotal: Money
+}
+
+export function monthlySummary(state: AppData, now = new Date()): MonthlySummary {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const prefix = `${y}-${String(m + 1).padStart(2, '0')}`
+  const prevPrefix = m === 0 ? `${y - 1}-12` : `${y}-${String(m).padStart(2, '0')}`
+  let total = 0
+  let prevTotal = 0
+  let count = 0
+  const byCategory: Record<string, Money> = {}
+  for (const e of state.expenses) {
+    if (e.date.startsWith(prefix)) {
+      total += e.amount
+      count += 1
+      byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount
+    } else if (e.date.startsWith(prevPrefix)) {
+      prevTotal += e.amount
+    }
+  }
+  return { total, count, byCategory, prevTotal }
+}
+
+export function daysLeft(bill: BillReminder, now = new Date()): number {
+  const [y, m, d] = bill.dueDate.split('-').map(Number)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dueStart = new Date(y, m - 1, d)
+  return Math.round((dueStart.getTime() - todayStart.getTime()) / 86_400_000)
+}
+
+export function upcomingBills(state: AppData): BillReminder[] {
+  return state.billReminders
+    .filter((b) => !b.paid)
+    .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))
 }
 
 export function agreementAwaitingSelf(state: AppData, memberId: ID): Agreement | undefined {
