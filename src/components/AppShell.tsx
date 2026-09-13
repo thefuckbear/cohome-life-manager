@@ -12,6 +12,7 @@ import {
   Home,
   Plus,
   ReceiptText,
+  Settings as SettingsIcon,
   Sparkles,
   Users,
   X,
@@ -29,6 +30,7 @@ const navigation = [
   { to: '/supplies', label: '公共物品', icon: Box },
   { to: '/agreements', label: '室友公约', icon: BookOpenCheck },
   { to: '/guide', label: '使用说明', icon: BookOpen },
+  { to: '/settings', label: '设置', icon: SettingsIcon },
 ]
 
 function Brand() {

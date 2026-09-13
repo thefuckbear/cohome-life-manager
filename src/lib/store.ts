@@ -8,6 +8,8 @@ import type {
   AgreementVersion,
   AgreementVote,
   AppData,
+  BillCycle,
+  BillPayment,
   BillReminder,
   ChoreArea,
   ChoreRule,
@@ -21,6 +23,7 @@ import type {
   SplitRule,
   Supply,
   SwapRequest,
+  TransferRecord,
 } from './types'
 
 const HOUSE_ID = 'h-main'
@@ -74,6 +77,16 @@ function uid(prefix: string): ID {
 }
 
 const COLOR_PALETTE = ['#e6a25a', '#6f9a83', '#7d83b7', '#c26742', '#5d8fa8', '#b78a6f']
+
+function nextDueDate(dueDate: string, cycle: BillCycle): string {
+  const [y, m, d] = dueDate.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  if (cycle === 'weekly') dt.setDate(dt.getDate() + 7)
+  else if (cycle === 'monthly') dt.setMonth(dt.getMonth() + 1)
+  else if (cycle === 'yearly') dt.setFullYear(dt.getFullYear() + 1)
+  else return dueDate
+  return dateKey(dt)
+}
 
 export function createSeedData(): AppData {
   const now = new Date()
@@ -137,9 +150,9 @@ export function createSeedData(): AppData {
   ]
 
   const billReminders: BillReminder[] = [
-    { id: 'b-rent', houseId: HOUSE_ID, title: '房租', amount: 3000, dueDate: dateKey(new Date(now.getFullYear(), now.getMonth(), 25)), createdBy: MEMBER_XIA, createdAt: toISO(addDays(now, -30)), paid: false },
-    { id: 'b-water', houseId: HOUSE_ID, title: '水费', amount: 86.5, dueDate: dateKey(addDays(now, -2)), createdBy: MEMBER_LIN, createdAt: toISO(addDays(now, -15)), paid: false },
-    { id: 'b-net', houseId: HOUSE_ID, title: '宽带费', amount: 120, dueDate: dateKey(addDays(now, 3)), createdBy: MEMBER_ZHOU, createdAt: toISO(addDays(now, -10)), paid: false },
+    { id: 'b-rent', houseId: HOUSE_ID, title: '房租', amount: 3000, dueDate: dateKey(new Date(now.getFullYear(), now.getMonth(), 25)), cycle: 'monthly', initiatorId: MEMBER_XIA, createdBy: MEMBER_XIA, createdAt: toISO(addDays(now, -30)), status: 'pending' },
+    { id: 'b-water', houseId: HOUSE_ID, title: '水费', amount: 86.5, dueDate: dateKey(addDays(now, -2)), cycle: 'monthly', initiatorId: MEMBER_LIN, createdBy: MEMBER_LIN, createdAt: toISO(addDays(now, -15)), status: 'pending' },
+    { id: 'b-net', houseId: HOUSE_ID, title: '宽带费', amount: 120, dueDate: dateKey(addDays(now, 3)), cycle: 'monthly', initiatorId: MEMBER_ZHOU, createdBy: MEMBER_ZHOU, createdAt: toISO(addDays(now, -10)), status: 'pending' },
   ]
 
   const agreements: Agreement[] = [
@@ -175,12 +188,14 @@ export function createSeedData(): AppData {
     members,
     expenses,
     shares,
+    transfers: [],
     choreRules,
     choreTasks: chores,
     swapRequests,
     supplies,
     purchases: [],
     billReminders,
+    billPayments: [],
     agreements,
     votes,
     agreementVersions: [],
@@ -216,9 +231,9 @@ export interface AppState extends AppData {
   switchAccount: (memberId: ID) => void
   saveSplitRule: (rule: SplitRule) => void
   remindExpense: (expenseId: ID, memberId: ID) => void
-  addBillReminder: (title: string, amount: Money, dueDate: string) => void
+  addBillReminder: (title: string, amount: Money, dueDate: string, cycle: BillCycle) => void
   deleteBillReminder: (billId: ID) => void
-  markBillPaid: (billId: ID) => void
+  payBill: (billId: ID) => 'ok' | 'insufficient' | 'already' | 'missing' | 'paid'
   addHouse: (name: string) => void
   switchHouse: (houseId: ID) => void
   reset: () => void
@@ -314,25 +329,44 @@ export const useStore = create<AppState>()(
           const self = houseMembers(state).find((m) => m.id === state.currentUserId)
           if (!self || self.balance < share.amount) return 'insufficient'
           const now = new Date().toISOString()
+          const payerName = houseMembers(state).find((m) => m.id === expense.payerId)?.name ?? '室友'
           set((s) => {
             const shares = s.shares.map((x) =>
               x.id === shareId ? { ...x, settled: true, settledAt: now } : x,
             )
-            const members = s.members.map((m) =>
-              m.id === s.currentUserId && m.houseId === s.currentHouseId
-                ? { ...m, balance: round2(m.balance - share.amount) }
-                : m,
-            )
+            const members = s.members.map((m) => {
+              if (m.id === s.currentUserId && m.houseId === s.currentHouseId) {
+                return { ...m, balance: round2(m.balance - share.amount) }
+              }
+              if (m.id === expense.payerId && m.houseId === s.currentHouseId) {
+                return { ...m, balance: round2(m.balance + share.amount) }
+              }
+              return m
+            })
+            const transfer: TransferRecord = {
+              id: uid('t'),
+              houseId: s.currentHouseId,
+              expenseId,
+              fromId: s.currentUserId,
+              toId: expense.payerId,
+              amount: share.amount,
+              at: now,
+            }
             const activity: ActivityEvent = {
               id: uid('a'),
               houseId: s.currentHouseId,
               actorId: s.currentUserId,
               type: 'expense_settled',
               targetId: expenseId,
-              summary: `结清了 ${expense.title}（扣款 ¥${share.amount.toFixed(2)}）`,
+              summary: `向${payerName}转账 ¥${share.amount.toFixed(2)} 结清「${expense.title}」`,
               at: now,
             }
-            return { shares, members, activities: [activity, ...s.activities] }
+            return {
+              shares,
+              members,
+              transfers: [...s.transfers, transfer],
+              activities: [activity, ...s.activities],
+            }
           })
           return 'ok'
         },
@@ -352,21 +386,39 @@ export const useStore = create<AppState>()(
           set((s) => {
             const ids = new Set(myShares.map((x) => x.id))
             const shares = s.shares.map((x) => (ids.has(x.id) ? { ...x, settled: true, settledAt: now } : x))
-            const members = s.members.map((m) =>
-              m.id === s.currentUserId && m.houseId === s.currentHouseId
-                ? { ...m, balance: round2(m.balance - total) }
-                : m,
-            )
+            const transfers: TransferRecord[] = []
+            const members = s.members.map((m) => {
+              let bal = m.balance
+              if (m.id === s.currentUserId && m.houseId === s.currentHouseId) {
+                bal = round2(bal - total)
+              }
+              for (const sh of myShares) {
+                const e = s.expenses.find((x) => x.id === sh.expenseId)
+                if (e && e.payerId === m.id && m.houseId === s.currentHouseId) {
+                  bal = round2(bal + sh.amount)
+                  transfers.push({
+                    id: uid('t'),
+                    houseId: s.currentHouseId,
+                    expenseId: sh.expenseId,
+                    fromId: s.currentUserId,
+                    toId: m.id,
+                    amount: sh.amount,
+                    at: now,
+                  })
+                }
+              }
+              return bal === m.balance ? m : { ...m, balance: bal }
+            })
             const activity: ActivityEvent = {
               id: uid('a'),
               houseId: s.currentHouseId,
               actorId: s.currentUserId,
               type: 'expense_settled',
               targetId: '',
-              summary: `一键结清了我的 ${myShares.length} 笔待结算（扣款 ¥${total.toFixed(2)}）`,
+              summary: `一键结清了我的 ${myShares.length} 笔待结算（共 ¥${total.toFixed(2)}）`,
               at: now,
             }
-            return { shares, members, activities: [activity, ...s.activities] }
+            return { shares, members, transfers: [...s.transfers, ...transfers], activities: [activity, ...s.activities] }
           })
           return 'ok'
         },
@@ -540,6 +592,7 @@ export const useStore = create<AppState>()(
           set((state) => {
             const [y, m, d] = date.split('-').map(Number)
             if (!y || !m || !d) return {}
+            if (date < dateKey(new Date())) return {}
             const [hh = 20, mm = 0] = (time ?? '20:00').split(':').map(Number)
             const dueDate = new Date(y, m - 1, d, hh, mm, 0, 0)
             const weekOf = dateKey(currentMonday(dueDate))
@@ -889,7 +942,7 @@ export const useStore = create<AppState>()(
             return { activities: [activity, ...state.activities] }
           })
         },
-        addBillReminder: (title, amount, dueDate) => {
+        addBillReminder: (title, amount, dueDate, cycle) => {
           set((state) => {
             const now = new Date().toISOString()
             const bill: BillReminder = {
@@ -898,9 +951,11 @@ export const useStore = create<AppState>()(
               title,
               amount: round2(amount),
               dueDate,
+              cycle,
+              initiatorId: state.currentUserId,
               createdBy: state.currentUserId,
               createdAt: now,
-              paid: false,
+              status: 'pending',
             }
             const activity: ActivityEvent = {
               id: uid('a'),
@@ -908,7 +963,7 @@ export const useStore = create<AppState>()(
               actorId: state.currentUserId,
               type: 'expense_added',
               targetId: bill.id,
-              summary: `登记了缴费日「${title}」`,
+              summary: `发起了共同缴费「${title}」（¥${round2(amount).toFixed(2)}，${dueDate} 截止）`,
               at: now,
             }
             return { billReminders: [...state.billReminders, bill], activities: [activity, ...state.activities] }
@@ -919,28 +974,75 @@ export const useStore = create<AppState>()(
             const bill = state.billReminders.find((b) => b.id === billId)
             if (!bill) return {}
             if (bill.createdBy !== state.currentUserId) return {}
-            return { billReminders: state.billReminders.filter((b) => b.id !== billId) }
+            return {
+              billReminders: state.billReminders.filter((b) => b.id !== billId),
+              billPayments: state.billPayments.filter((p) => p.billId !== billId),
+            }
           })
         },
-        markBillPaid: (billId) => {
-          set((state) => {
-            const bill = state.billReminders.find((b) => b.id === billId)
-            if (!bill || bill.paid) return {}
-            const now = new Date().toISOString()
+        payBill: (billId) => {
+          const state = get()
+          const bill = state.billReminders.find((b) => b.id === billId)
+          if (!bill) return 'missing'
+          if (bill.status === 'paid') return 'paid'
+          const members = state.members.filter((m) => m.houseId === bill.houseId)
+          const n = members.length || 1
+          const perMember = round2(bill.amount / n)
+          if (state.billPayments.some((p) => p.billId === billId && p.memberId === state.currentUserId)) return 'already'
+          const self = members.find((m) => m.id === state.currentUserId)
+          if (!self || self.balance < perMember) return 'insufficient'
+          const now = new Date().toISOString()
+          set((s) => {
+            const members2 = s.members.map((m) => {
+              let bal = m.balance
+              if (m.id === s.currentUserId && m.houseId === bill.houseId) {
+                bal = round2(bal - perMember)
+              }
+              if (m.id === bill.initiatorId && m.houseId === bill.houseId) {
+                bal = round2(bal + perMember)
+              }
+              return bal === m.balance ? m : { ...m, balance: bal }
+            })
+            const payment: BillPayment = {
+              id: uid('bp'),
+              houseId: bill.houseId,
+              billId,
+              memberId: s.currentUserId,
+              amount: perMember,
+              paidAt: now,
+            }
+            const newPayments = [...s.billPayments, payment]
+            const allPaid = newPayments.filter((p) => p.billId === billId).length >= n
+            let billReminders = s.billReminders.map((b) =>
+              b.id === billId ? { ...b, status: allPaid ? ('paid' as const) : b.status } : b,
+            )
+            let summary = `支付了「${bill.title}」的 ¥${perMember.toFixed(2)}`
+            if (allPaid) {
+              const initiator = s.members.find((m) => m.id === bill.initiatorId)
+              summary = `「${bill.title}」全员已缴，款项已汇给${initiator?.name ?? '发起人'}`
+              if (bill.cycle !== 'once') {
+                const next: BillReminder = {
+                  ...bill,
+                  id: uid('b'),
+                  dueDate: nextDueDate(bill.dueDate, bill.cycle),
+                  status: 'pending',
+                  createdAt: now,
+                }
+                billReminders = [...billReminders, next]
+              }
+            }
             const activity: ActivityEvent = {
               id: uid('a'),
-              houseId: state.currentHouseId,
-              actorId: state.currentUserId,
+              houseId: s.currentHouseId,
+              actorId: s.currentUserId,
               type: 'expense_settled',
               targetId: billId,
-              summary: `标记「${bill.title}」已缴费`,
+              summary,
               at: now,
             }
-            return {
-              billReminders: state.billReminders.map((b) => (b.id === billId ? { ...b, paid: true } : b)),
-              activities: [activity, ...state.activities],
-            }
+            return { members: members2, billPayments: newPayments, billReminders, activities: [activity, ...s.activities] }
           })
+          return 'ok'
         },
         addHouse: (name) => {
           set((state) => {
@@ -995,7 +1097,7 @@ export const useStore = create<AppState>()(
     },
     {
       name: 'cohome:store',
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         houses: state.houses,
@@ -1003,12 +1105,14 @@ export const useStore = create<AppState>()(
         members: state.members,
         expenses: state.expenses,
         shares: state.shares,
+        transfers: state.transfers,
         choreRules: state.choreRules,
         choreTasks: state.choreTasks,
         swapRequests: state.swapRequests,
         supplies: state.supplies,
         purchases: state.purchases,
         billReminders: state.billReminders,
+        billPayments: state.billPayments,
         agreements: state.agreements,
         votes: state.votes,
         agreementVersions: state.agreementVersions,

@@ -4,9 +4,9 @@ import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
 import {
   addDaysLocal,
-  choresDoneCount,
   choreCompletionCounts,
-  choresThisWeek,
+  choresDoneCountFor,
+  choresForWeek,
   choreReminderStage,
   currentMonday,
   dateKey,
@@ -91,14 +91,14 @@ function ClaimModal({ onClose }: { onClose: () => void }) {
       <div className="form-row">
         <div className="form-field">
           <span className="form-label">值日日期</span>
-          <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input className="form-input" type="date" min={dateKey(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className="form-field">
           <span className="form-label">截止时间</span>
           <input className="form-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
-      <p className="form-label" style={{ color: '#9aa09c' }}>默认下周；截止前 10 分钟会收到通知。</p>
+      <p className="form-label" style={{ color: '#9aa09c' }}>只能选今天及以后的日期；截止前 10 分钟会收到通知。</p>
       <div className="modal__footer">
         <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
         <button className="button button--primary" type="button" disabled={!date || !time} onClick={submit}><Plus size={15} /> 认领值日</button>
@@ -140,10 +140,11 @@ export function Chores() {
   const [swapTask, setSwapTask] = useState<ChoreTask | null>(null)
   const [completeTask, setCompleteTask] = useState<ChoreTask | null>(null)
   const [showClaim, setShowClaim] = useState(false)
+  const [weekOffset, setWeekOffset] = useState(0)
 
-  const tasks = choresThisWeek(store)
-  const done = choresDoneCount(store)
-  const { weekNumber, label } = weekRangeLabel()
+  const tasks = choresForWeek(store, weekOffset)
+  const done = choresDoneCountFor(store, weekOffset)
+  const { weekNumber, label } = weekRangeLabel(weekOffset)
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0
 
   const today = todayKey()
@@ -233,17 +234,21 @@ export function Chores() {
       <section className="schedule-summary">
         <div>
           <span className="schedule-icon"><CalendarDays size={24} /></span>
-          <div><small>第 {weekNumber} 周</small><strong>{label}</strong></div>
+          <div><small>{weekOffset === 0 ? '本周' : weekOffset === 1 ? '下周' : `第 ${weekNumber} 周`}</small><strong>{label}</strong></div>
         </div>
         <div className="progress-copy">
           <span><strong>{done}</strong> / {tasks.length} 已完成{overdueCount > 0 ? ` · ${overdueCount} 项已逾期` : ''}</span>
           <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         </div>
+        <div className="header-actions">
+          <button className="button button--secondary" type="button" disabled={weekOffset === 0} onClick={() => setWeekOffset(0)}>本周</button>
+          <button className="button button--secondary" type="button" disabled={weekOffset === 1} onClick={() => setWeekOffset(1)}>下周</button>
+        </div>
       </section>
 
       <section className="panel module-panel">
         <div className="panel__header">
-          <div><h2>本周排班</h2><p>各自认领、自觉完成，逾期会高亮提醒</p></div>
+          <div><h2>{weekOffset === 0 ? '本周排班' : '下周排班'}</h2><p>各自认领、自觉完成，逾期会高亮提醒</p></div>
         </div>
         <div className="chore-stats">
           <span className="chore-stats__label">本月完成</span>

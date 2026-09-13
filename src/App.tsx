@@ -5,6 +5,7 @@ import { Chores } from './pages/Chores'
 import { Dashboard } from './pages/Dashboard'
 import { Expenses } from './pages/Expenses'
 import { Guide } from './pages/Guide'
+import { Settings } from './pages/Settings'
 import { Supplies } from './pages/Supplies'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/supplies" element={<Supplies />} />
         <Route path="/agreements" element={<Agreements />} />
         <Route path="/guide" element={<Guide />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

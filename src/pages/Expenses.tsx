@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ArrowDownLeft,
   ArrowUpRight,
   BellRing,
   CalendarClock,
@@ -16,7 +15,7 @@ import {
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
 import {
-  computeSettlements,
+  billProgress,
   dateKey,
   daysLeft,
   expenseStatus,
@@ -26,13 +25,14 @@ import {
   getSelf,
   monthlySummary,
   payableFor,
-  receivableFor,
   round2,
+  timeAgo,
+  transferRecords,
   upcomingBills,
   yuan,
 } from '../lib/selectors'
 import { useStore } from '../lib/store'
-import type { Expense, ExpenseCategory, ID, SplitMode } from '../lib/types'
+import type { BillCycle, Expense, ExpenseCategory, ID, SplitMode } from '../lib/types'
 
 const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   rent: '房租',
@@ -338,24 +338,25 @@ function BillModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('')
   const [amountYuan, setAmountYuan] = useState('')
   const [dueDate, setDueDate] = useState(dateKey(new Date()))
+  const [cycle, setCycle] = useState<BillCycle>('monthly')
   const [error, setError] = useState('')
 
   const submit = () => {
-    if (!title.trim()) return setError('请填写账单名称')
+    if (!title.trim()) return setError('请填写缴费名称')
     const amount = round2(parseFloat(amountYuan || '0'))
     if (!(amount > 0)) return setError('请填写正确的金额')
     if (!dueDate) return setError('请选择截止日期')
-    store.addBillReminder(title.trim(), amount, dueDate)
-    notify(`已登记缴费日「${title.trim()}」`)
+    store.addBillReminder(title.trim(), amount, dueDate, cycle)
+    notify(`已发起共同缴费「${title.trim()}」，全员付款后款项汇给你`)
     onClose()
   }
 
   return (
     <div className="form">
-      <p className="form-label" style={{ color: '#7f8a83' }}>房租、水电费这类有固定截止日的账单，到期前会提醒大家。</p>
+      <p className="form-label" style={{ color: '#7f8a83' }}>水电燃气等共同缴费：你作为发起人，室友各自付款，全部付清后款项汇入你的余额。</p>
       <div className="form-field">
-        <label className="form-label" htmlFor="bill-title">账单名称</label>
-        <input id="bill-title" className="form-input" value={title} placeholder="例如：房租" onChange={(e) => { setTitle(e.target.value); setError('') }} />
+        <label className="form-label" htmlFor="bill-title">缴费名称</label>
+        <input id="bill-title" className="form-input" value={title} placeholder="例如：9 月电费" onChange={(e) => { setTitle(e.target.value); setError('') }} />
       </div>
       <div className="form-row">
         <div className="form-field">
@@ -367,10 +368,19 @@ function BillModal({ onClose }: { onClose: () => void }) {
           <input id="bill-due" className="form-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </div>
       </div>
+      <div className="form-field">
+        <label className="form-label" htmlFor="bill-cycle">循环周期</label>
+        <select id="bill-cycle" className="form-select" value={cycle} onChange={(e) => setCycle(e.target.value as BillCycle)}>
+          <option value="once">仅一次</option>
+          <option value="weekly">每周循环</option>
+          <option value="monthly">每月循环</option>
+          <option value="yearly">每年循环</option>
+        </select>
+      </div>
       {error && <p className="form-error">{error}</p>}
       <div className="modal__footer">
         <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
-        <button className="button button--primary" type="button" onClick={submit}><CalendarClock size={15} /> 登记</button>
+        <button className="button button--primary" type="button" onClick={submit}><CalendarClock size={15} /> 发起缴费</button>
       </div>
     </div>
   )
@@ -418,9 +428,8 @@ export function Expenses() {
   const [showBill, setShowBill] = useState(false)
 
   const payable = payableFor(store, selfId)
-  const receivable = receivableFor(store, selfId)
   const total = expenseTotal(store)
-  const settlements = computeSettlements(store)
+  const transfers = transferRecords(store)
   const summary = monthlySummary(store)
   const billsDue = upcomingBills(store)
   const catOrder: ExpenseCategory[] = ['rent', 'utility', 'daily', 'internet', 'other']
@@ -456,29 +465,29 @@ export function Expenses() {
 
       <section className="metric-row">
         <article className="metric-card"><span className="metric-icon metric-icon--orange"><ArrowUpRight size={20} /></span><div><small>我需要支付</small><strong>¥{yuan(payable.total)}</strong><span>共 {payable.count} 笔待结算</span></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon--green"><ArrowDownLeft size={20} /></span><div><small>我将收到</small><strong>¥{yuan(receivable.total)}</strong><span>来自室友的待结算</span></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon--purple"><CircleDollarSign size={20} /></span><div><small>共同支出总额</small><strong>¥{yuan(total)}</strong><span>已记录 {store.expenses.filter((e) => e.houseId === store.currentHouseId).length} 笔费用</span></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon--green"><Wallet size={20} /></span><div><small>我的余额</small><strong>¥{yuan(self?.balance ?? 0)}</strong><button className="button button--ghost" type="button" style={{ padding: 0, minHeight: 24 }} onClick={() => setShowRecharge(true)}><Wallet size={12} /> 充值</button></div></article>
       </section>
 
-      {settlements.length > 0 && (
+      {transfers.length > 0 && (
         <section className="panel module-panel">
           <div className="panel__header">
-            <div><h2>结算方案</h2><p>按下面转账，账就平了</p></div>
-            <span className="tag tag--warm">{settlements.length} 笔转账</span>
+            <div><h2>转账记录</h2><p>结清账单时，钱自动转到垫付人余额</p></div>
+            <span className="tag tag--warm">{transfers.length} 笔</span>
           </div>
           <div className="settlement-list">
-            {settlements.map((s) => {
-              const from = getMember(store, s.from)
-              const to = getMember(store, s.to)
+            {transfers.slice(0, 8).map((t) => {
+              const from = getMember(store, t.fromId)
+              const to = getMember(store, t.toId)
               return (
-                <div className="settlement-row" key={`${s.from}-${s.to}`}>
+                <div className="settlement-row" key={t.id}>
                   <span className="avatar avatar--sm" style={{ background: from?.color }}>{from?.initials}</span>
                   <strong>{from?.name}</strong>
                   <span className="settlement-arrow">转给</span>
                   <span className="avatar avatar--sm" style={{ background: to?.color }}>{to?.initials}</span>
                   <strong>{to?.name}</strong>
-                  <span className="settlement-amount">¥{yuan(s.amount)}</span>
+                  <span className="settlement-amount">¥{yuan(t.amount)}</span>
+                  <span className="settlement-arrow">{timeAgo(t.at)}</span>
                 </div>
               )
             })}
@@ -542,27 +551,40 @@ export function Expenses() {
 
       <section className="panel module-panel">
         <div className="panel__header">
-          <div><h2>缴费日</h2><p>房租水电等外部账单的截止日，逾期高亮提醒</p></div>
-          <button className="button button--secondary" type="button" onClick={() => setShowBill(true)}><CalendarClock size={16} /> 登记缴费日</button>
+          <div><h2>共同缴费</h2><p>水电类缴费：到期前付款，全员付清款项汇给发起人</p></div>
+          <button className="button button--secondary" type="button" onClick={() => setShowBill(true)}><CalendarClock size={16} /> 发起缴费</button>
         </div>
         <div className="table-list">
           {billsDue.length === 0 && (
-            <div className="table-row"><div className="table-row__main"><strong>暂无待缴账单</strong><span>都缴清啦</span></div></div>
+            <div className="table-row"><div className="table-row__main"><strong>暂无待缴的共同缴费</strong><span>都缴清啦</span></div></div>
           )}
           {billsDue.map((bill) => {
             const left = daysLeft(bill)
             const overdue = left < 0
             const soon = left >= 0 && left <= 3
-            const creator = getMember(store, bill.createdBy)
+            const initiator = getMember(store, bill.initiatorId)
+            const prog = billProgress(store, bill)
+            const cycleLabel = bill.cycle === 'once' ? '仅一次' : bill.cycle === 'weekly' ? '每周' : bill.cycle === 'monthly' ? '每月' : '每年'
             return (
               <article className="table-row" key={bill.id}>
                 <span className="item-emoji">🧾</span>
-                <div className="table-row__main"><strong>{bill.title}</strong><span>{creator?.name} 登记 · {bill.dueDate} 截止</span></div>
+                <div className="table-row__main">
+                  <strong>{bill.title}</strong>
+                  <span>{initiator?.name} 发起 · {bill.dueDate} 截止 · {cycleLabel}循环 · 已付 {prog.paidCount}/{prog.memberCount} 人</span>
+                </div>
                 <strong className="table-amount">¥{yuan(bill.amount)}</strong>
-                <span className={`tag ${overdue ? 'tag--danger' : soon ? 'tag--warm' : 'tag--success'}`}>{overdue ? `已逾期 ${-left} 天` : `还有 ${left} 天`}</span>
-                <button className="button button--ghost" type="button" onClick={() => { store.markBillPaid(bill.id); notify(`已标记「${bill.title}」已缴费`) }}>标记已缴</button>
+                <span className={`tag ${overdue ? 'tag--danger' : soon ? 'tag--warm' : 'tag--success'}`}>{overdue ? `已逾期 ${-left} 天` : left === 0 ? '今天截止' : `还有 ${left} 天`}</span>
+                {prog.myPaid ? (
+                  <span className="tag tag--success"><Check size={13} /> 我已付款</span>
+                ) : (
+                  <button className="button button--primary" type="button" onClick={() => {
+                    const r = store.payBill(bill.id)
+                    if (r === 'insufficient') { notify('余额不足，请先充值'); setShowRecharge(true) }
+                    else if (r === 'ok') notify(`已付 ¥${yuan(prog.perMember)}，${prog.allPaid ? '全员已缴，款项已汇给发起人' : `还差 ${prog.memberCount - prog.paidCount - 1} 人`}`)
+                  }}>付 ¥{yuan(prog.perMember)}</button>
+                )}
                 {bill.createdBy === selfId && (
-                  <button className="button button--ghost" type="button" aria-label="删除缴费日" onClick={() => store.deleteBillReminder(bill.id)}><Trash2 size={15} /></button>
+                  <button className="button button--ghost" type="button" aria-label="删除缴费" onClick={() => store.deleteBillReminder(bill.id)}><Trash2 size={15} /></button>
                 )}
               </article>
             )

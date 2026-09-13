@@ -2,6 +2,7 @@ import type {
   AddExpenseInput,
   Agreement,
   AppData,
+  BillPayment,
   BillReminder,
   ChoreTask,
   Expense,
@@ -9,6 +10,7 @@ import type {
   ID,
   Member,
   Money,
+  TransferRecord,
 } from './types'
 
 /** 浮点金额保留两位小数（分精度），所有金额出入口都过一遍 */
@@ -98,36 +100,6 @@ export function computeNetBalances(state: AppData): Record<ID, Money> {
   return net
 }
 
-export interface Settlement {
-  from: ID
-  to: ID
-  amount: Money
-}
-
-export function computeSettlements(state: AppData): Settlement[] {
-  const net = computeNetBalances(state)
-  const creditors: { id: ID; amount: Money }[] = []
-  const debtors: { id: ID; amount: Money }[] = []
-  for (const [id, value] of Object.entries(net)) {
-    if (value > 0) creditors.push({ id, amount: value })
-    else if (value < 0) debtors.push({ id, amount: -value })
-  }
-  creditors.sort((a, b) => b.amount - a.amount)
-  debtors.sort((a, b) => b.amount - a.amount)
-  const result: Settlement[] = []
-  let i = 0
-  let j = 0
-  while (i < debtors.length && j < creditors.length) {
-    const amount = round2(Math.min(debtors[i].amount, creditors[j].amount))
-    result.push({ from: debtors[i].id, to: creditors[j].id, amount })
-    debtors[i].amount = round2(debtors[i].amount - amount)
-    creditors[j].amount = round2(creditors[j].amount - amount)
-    if (debtors[i].amount === 0) i += 1
-    if (creditors[j].amount === 0) j += 1
-  }
-  return result
-}
-
 export interface PendingShare {
   share: ExpenseShare
   expense: Expense
@@ -183,8 +155,17 @@ export function choreReminderStage(task: ChoreTask, now = new Date()): ReminderS
 }
 
 export function choresThisWeek(state: AppData): ChoreTask[] {
-  const weekOf = dateKey(currentMonday())
+  return choresForWeek(state, 0)
+}
+
+/** 按周偏移查排班：0=本周，1=下周，-1=上周 */
+export function choresForWeek(state: AppData, weekOffset: number): ChoreTask[] {
+  const weekOf = dateKey(addDaysLocal(currentMonday(), weekOffset * 7))
   return scoped(state, state.choreTasks).filter((c) => c.weekOf === weekOf)
+}
+
+export function choresDoneCountFor(state: AppData, weekOffset: number): number {
+  return choresForWeek(state, weekOffset).filter((c) => c.status === 'done').length
 }
 
 export function choresDoneCount(state: AppData): number {
@@ -196,8 +177,8 @@ export function nextWeekGenerated(state: AppData): boolean {
   return scoped(state, state.choreTasks).some((c) => c.weekOf === weekOf)
 }
 
-export function weekRangeLabel(): { weekNumber: number; label: string } {
-  const monday = currentMonday()
+export function weekRangeLabel(weekOffset = 0): { weekNumber: number; label: string } {
+  const monday = addDaysLocal(currentMonday(), weekOffset * 7)
   const sunday = addDaysLocal(monday, 6)
   const startOfYear = new Date(monday.getFullYear(), 0, 1)
   const weekNumber = Math.ceil((monday.getTime() - startOfYear.getTime()) / 86400000 / 7) + 1
@@ -304,8 +285,30 @@ export function daysLeft(bill: BillReminder, now = new Date()): number {
 
 export function upcomingBills(state: AppData): BillReminder[] {
   return scoped(state, state.billReminders)
-    .filter((b) => !b.paid)
+    .filter((b) => b.status === 'pending')
     .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))
+}
+
+export interface BillProgress {
+  paidCount: number
+  memberCount: number
+  myPaid: boolean
+  perMember: Money
+  allPaid: boolean
+}
+
+export function billProgress(state: AppData, bill: BillReminder): BillProgress {
+  const members = scoped(state, state.members)
+  const payments = scoped(state, state.billPayments).filter((p) => p.billId === bill.id)
+  const n = members.length || 1
+  const others = round2(bill.amount / n)
+  return {
+    paidCount: payments.length,
+    memberCount: n,
+    myPaid: payments.some((p) => p.memberId === state.currentUserId),
+    perMember: others,
+    allPaid: payments.length >= n,
+  }
 }
 
 export function choreCompletionCounts(state: AppData, now = new Date()): Record<ID, number> {
@@ -375,22 +378,13 @@ export function payableFor(state: AppData, memberId: ID): MoneySummary {
   return { total, count }
 }
 
-export function receivableFor(state: AppData, memberId: ID): MoneySummary {
-  let total = 0
-  let count = 0
-  for (const share of scoped(state, state.shares)) {
-    if (share.settled || share.memberId === memberId) continue
-    const expense = getExpense(state, share.expenseId)
-    if (expense && expense.payerId === memberId) {
-      total = round2(total + share.amount)
-      count += 1
-    }
-  }
-  return { total, count }
-}
-
 export function expenseTotal(state: AppData): Money {
   return round2(scoped(state, state.expenses).reduce((sum, e) => sum + e.amount, 0))
+}
+
+/** 转账记录（按时间倒序）：谁转给谁多少钱 */
+export function transferRecords(state: AppData): TransferRecord[] {
+  return scoped(state, state.transfers).sort((a, b) => (a.at < b.at ? 1 : -1))
 }
 
 export function expenseShares(state: AppData, expenseId: ID): ExpenseShare[] {

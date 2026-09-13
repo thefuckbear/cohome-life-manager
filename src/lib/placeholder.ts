@@ -1,5 +1,25 @@
 export const PLACEHOLDER_EVENT = 'cohome:placeholder'
 export const NOTIFY_EVENT = 'cohome:notify'
+const THEME_KEY = 'cohome:theme'
+
+export type Theme = 'light' | 'dark'
+
+export function getTheme(): Theme {
+  try {
+    return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
+}
+
+export function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', theme)
+  try {
+    localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    // 存储不可用时静默
+  }
+}
 
 let audio: HTMLAudioElement | null = null
 

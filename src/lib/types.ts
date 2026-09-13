@@ -61,6 +61,17 @@ export interface ExpenseShare {
   settledAt?: string
 }
 
+/** 转账记录：某人结清分摊时，钱从付款人流向垫付人 */
+export interface TransferRecord {
+  id: ID
+  houseId: ID
+  expenseId: ID
+  fromId: ID
+  toId: ID
+  amount: Money
+  at: string
+}
+
 export type ChoreArea = 'kitchen' | 'living' | 'bathroom' | 'trash' | 'custom'
 export type ChoreStatus = 'pending' | 'done'
 
@@ -125,15 +136,29 @@ export interface PurchaseLog {
   expenseId?: ID
 }
 
+export type BillCycle = 'once' | 'weekly' | 'monthly' | 'yearly'
+
+/** 缴费日：水电等共同缴费，有截止日、可按周期循环，全员付款才算已缴，款项汇给发起人 */
 export interface BillReminder {
   id: ID
   houseId: ID
   title: string
   amount: Money
   dueDate: string
+  cycle: BillCycle
+  initiatorId: ID
   createdBy: ID
   createdAt: string
-  paid: boolean
+  status: 'pending' | 'paid'
+}
+
+export interface BillPayment {
+  id: ID
+  houseId: ID
+  billId: ID
+  memberId: ID
+  amount: Money
+  paidAt: string
 }
 
 export type AgreementStatus = 'draft' | 'voting' | 'active' | 'archived'
@@ -209,12 +234,14 @@ export interface AppData {
   members: Member[]
   expenses: Expense[]
   shares: ExpenseShare[]
+  transfers: TransferRecord[]
   choreRules: ChoreRule[]
   choreTasks: ChoreTask[]
   swapRequests: SwapRequest[]
   supplies: Supply[]
   purchases: PurchaseLog[]
   billReminders: BillReminder[]
+  billPayments: BillPayment[]
   agreements: Agreement[]
   votes: AgreementVote[]
   agreementVersions: AgreementVersion[]
