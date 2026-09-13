@@ -5,6 +5,7 @@ import { notify } from '../lib/placeholder'
 import {
   addDaysLocal,
   choresDoneCount,
+  choreCompletionCounts,
   choresThisWeek,
   choreReminderStage,
   currentMonday,
@@ -99,11 +100,38 @@ function ClaimModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function CompleteModal({ task, onClose }: { task: ChoreTask; onClose: () => void }) {
+  const store = useStore()
+  const [note, setNote] = useState('')
+
+  return (
+    <Modal title="完成值日" onClose={onClose}>
+      <div className="form">
+        <p className="form-label">完成「{task.title}」了？可留一句备注作为凭证。</p>
+        <div className="form-field">
+          <textarea
+            className="form-input"
+            style={{ height: '72px', padding: '9px 11px', resize: 'vertical' }}
+            value={note}
+            placeholder="例如：已拖地、倒垃圾、擦灶台"
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+        <div className="modal__footer">
+          <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+          <button className="button button--primary" type="button" onClick={() => { store.completeChore(task.id, note); notify(note.trim() ? '已完成值日，备注已记录' : '已完成值日'); onClose() }}><Check size={15} /> 确认完成</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export function Chores() {
   const store = useStore()
   const self = getSelf(store)
   const selfId = self?.id ?? ''
   const [swapTask, setSwapTask] = useState<ChoreTask | null>(null)
+  const [completeTask, setCompleteTask] = useState<ChoreTask | null>(null)
   const [showClaim, setShowClaim] = useState(false)
 
   const tasks = choresThisWeek(store)
@@ -119,6 +147,7 @@ export function Chores() {
   const myStage = myToday ? choreReminderStage(myToday) : null
   const myIncoming = store.swapRequests.filter((r) => r.toId === selfId && r.status === 'pending')
   const myOutgoing = store.swapRequests.filter((r) => r.fromId === selfId && r.status === 'pending')
+  const choreCounts = choreCompletionCounts(store)
 
   useEffect(() => {
     if (!self) return
@@ -223,6 +252,15 @@ export function Chores() {
         <div className="panel__header">
           <div><h2>本周排班</h2><p>各自认领、自觉完成，逾期会高亮提醒</p></div>
         </div>
+        <div className="chore-stats">
+          <span className="chore-stats__label">本月完成</span>
+          {store.members.map((m) => (
+            <span key={m.id} className="chore-stat">
+              <span className="avatar avatar--sm" style={{ background: m.color }}>{m.initials}</span>
+              <span>{m.name} · <strong>{choreCounts[m.id] ?? 0}</strong> 次</span>
+            </span>
+          ))}
+        </div>
         <div className="chore-grid">
           {tasks.map((item) => {
             const member = getMember(store, item.assigneeId)
@@ -235,7 +273,11 @@ export function Chores() {
                 <div className="chore-card__date"><strong>{item.dayLabel}</strong><span>{item.date}</span></div>
                 <div className="chore-card__body">
                   <span className="avatar" style={{ background: member?.color }}>{member?.initials}</span>
-                  <div><small>{member?.name}{item.swappedFromId ? '（已换班）' : ''}负责</small><strong>{item.title}</strong></div>
+                  <div>
+                    <small>{member?.name}{item.swappedFromId ? '（已换班）' : ''}负责</small>
+                    <strong>{item.title}</strong>
+                    {isDone && item.note && <small className="chore-note">📝 {item.note}</small>}
+                  </div>
                 </div>
                 <span className={`tag ${isDone ? 'tag--success' : overdue ? 'tag--danger' : 'tag--warm'}`}>{isDone && <Check size={13} />}{isDone ? '已完成' : overdue ? '已逾期' : `截止 ${formatDue(item.dueAt)}`}</span>
                 {isDone ? (
@@ -244,7 +286,7 @@ export function Chores() {
                   <div className="chore-actions">
                     <button className="button button--ghost" type="button" aria-label="删除任务" onClick={() => handleDelete(item)}><Trash2 size={15} /></button>
                     <button className="button button--secondary" type="button" disabled={hasPendingSwap} onClick={() => setSwapTask(item)}><Repeat2 size={15} /> {hasPendingSwap ? '邀请待回应' : '换班'}</button>
-                    <button className="button button--primary" type="button" onClick={() => store.completeChore(item.id)}><Check size={15} /> 完成</button>
+                    <button className="button button--primary" type="button" onClick={() => setCompleteTask(item)}><Check size={15} /> 完成</button>
                   </div>
                 ) : (
                   <button className="button button--secondary" type="button" onClick={() => handleRemind(item)}><BellRing size={15} /> 提醒</button>
@@ -256,6 +298,7 @@ export function Chores() {
       </section>
 
       {swapTask && <SwapModal task={swapTask} onClose={() => setSwapTask(null)} />}
+      {completeTask && <CompleteModal task={completeTask} onClose={() => setCompleteTask(null)} />}
       {showClaim && <Modal title="认领值日" onClose={() => setShowClaim(false)}><ClaimModal onClose={() => setShowClaim(false)} /></Modal>}
     </div>
   )

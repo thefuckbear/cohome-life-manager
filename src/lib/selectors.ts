@@ -283,6 +283,22 @@ export function upcomingBills(state: AppData): BillReminder[] {
     .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))
 }
 
+export function choreCompletionCounts(state: AppData, now = new Date()): Record<ID, number> {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const prefix = `${y}-${String(m + 1).padStart(2, '0')}`
+  const counts: Record<ID, number> = {}
+  for (const t of state.choreTasks) {
+    if (t.status !== 'done' || !t.completedAt) continue
+    const d = new Date(t.completedAt)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    if (key !== prefix) continue
+    const who = t.completedBy ?? t.assigneeId
+    counts[who] = (counts[who] ?? 0) + 1
+  }
+  return counts
+}
+
 export function agreementAwaitingSelf(state: AppData, memberId: ID): Agreement | undefined {
   return state.agreements.find(
     (a) =>

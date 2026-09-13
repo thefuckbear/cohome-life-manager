@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { BellRing, BookOpenCheck, Check, Clock3, Plus, ThumbsUp, Trash2, Users } from 'lucide-react'
+import { BellRing, BookOpenCheck, Check, Clock3, History, Pencil, Plus, ThumbsUp, Trash2, Users } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
-import { getMember, getSelf } from '../lib/selectors'
+import { getMember, getSelf, timeAgo } from '../lib/selectors'
 import { useStore } from '../lib/store'
 import type { Agreement, ID } from '../lib/types'
 
@@ -90,11 +90,83 @@ function ProposeModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function EditModal({ agreement, onClose }: { agreement: Agreement; onClose: () => void }) {
+  const store = useStore()
+  const [title, setTitle] = useState(agreement.title)
+  const [content, setContent] = useState(agreement.content)
+  const [error, setError] = useState('')
+
+  const submit = () => {
+    if (!title.trim()) return setError('请填写公约标题')
+    if (!content.trim()) return setError('请填写公约内容')
+    store.updateAgreement(agreement.id, title.trim(), content.trim())
+    notify(`已修改「${title.trim()}」，需全员重新确认`)
+    onClose()
+  }
+
+  return (
+    <div className="form">
+      <div className="form-field">
+        <label className="form-label" htmlFor="edit-title">公约标题</label>
+        <input id="edit-title" className="form-input" value={title} onChange={(e) => { setTitle(e.target.value); setError('') }} />
+      </div>
+      <div className="form-field">
+        <label className="form-label" htmlFor="edit-content">公约内容</label>
+        <textarea id="edit-content" className="form-input" style={{ height: '88px', padding: '9px 11px', resize: 'vertical' }} value={content} onChange={(e) => { setContent(e.target.value); setError('') }} />
+      </div>
+      <p className="form-label" style={{ color: '#7f8a83' }}>修改后版本号 +1，状态回到「待确认」，需全员重新同意才生效。</p>
+      {error && <p className="form-error">{error}</p>}
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>取消</button>
+        <button className="button button--primary" type="button" onClick={submit}><Pencil size={15} /> 保存修改</button>
+      </div>
+    </div>
+  )
+}
+
+function HistoryModal({ agreement, onClose }: { agreement: Agreement; onClose: () => void }) {
+  const store = useStore()
+  const history = store.agreementVersions
+    .filter((v) => v.agreementId === agreement.id)
+    .sort((a, b) => b.version - a.version)
+
+  const rows = [
+    { version: agreement.version, title: agreement.title, content: agreement.content, editedBy: agreement.createdBy, editedAt: agreement.createdAt, current: true },
+    ...history.map((v) => ({ version: v.version, title: v.title, content: v.content, editedBy: v.editedBy, editedAt: v.editedAt, current: false })),
+  ]
+
+  return (
+    <div>
+      <div className="version-list">
+        {rows.map((r) => {
+          const editor = getMember(store, r.editedBy)
+          return (
+            <div className="version-row" key={r.version}>
+              <div className="version-row__head">
+                <span className="tag tag--success">v{r.version}</span>
+                {r.current && <span className="tag tag--warm">当前</span>}
+                <span className="version-row__meta">{editor?.name} · {timeAgo(r.editedAt)}</span>
+              </div>
+              <strong>{r.title}</strong>
+              <p>{r.content}</p>
+            </div>
+          )
+        })}
+      </div>
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>关闭</button>
+      </div>
+    </div>
+  )
+}
+
 export function Agreements() {
   const store = useStore()
   const self = getSelf(store)
   const selfId = self?.id ?? ''
   const [remindAgreement, setRemindAgreement] = useState<Agreement | null>(null)
+  const [editAgreement, setEditAgreement] = useState<Agreement | null>(null)
+  const [historyAgreement, setHistoryAgreement] = useState<Agreement | null>(null)
   const [showPropose, setShowPropose] = useState(false)
 
   const confirmCount = (agreementId: string) =>
@@ -143,18 +215,22 @@ export function Agreements() {
                   <p>{item.content}</p>
                   <span>{count} / {store.members.length} 位室友已同意</span>
                 </div>
-                {isActive ? (
-                  <div className="chore-actions">
+                <div className="chore-actions">
+                  {isActive ? (
                     <button className="button button--secondary" type="button" onClick={() => setRemindAgreement(item)}><BellRing size={15} /> 一键提醒</button>
-                    {item.createdBy === selfId && (
+                  ) : hasVoted ? (
+                    <span className="tag tag--success"><Check size={13} /> 我已同意</span>
+                  ) : (
+                    <button className="button button--primary" type="button" onClick={() => { store.voteAgreement(item.id, true); notify(`已同意「${item.title}」，还需 ${store.members.length - count - 1} 位室友确认`) }}><ThumbsUp size={15} /> 同意</button>
+                  )}
+                  <button className="button button--ghost" type="button" onClick={() => setHistoryAgreement(item)}><History size={15} /> 历史</button>
+                  {item.createdBy === selfId && (
+                    <>
+                      <button className="button button--ghost" type="button" onClick={() => setEditAgreement(item)}><Pencil size={15} /> 修改</button>
                       <button className="button button--ghost" type="button" aria-label="删除公约" onClick={() => handleDelete(item)}><Trash2 size={15} /></button>
-                    )}
-                  </div>
-                ) : hasVoted ? (
-                  <span className="tag tag--success"><Check size={13} /> 我已同意</span>
-                ) : (
-                  <button className="button button--primary" type="button" onClick={() => { store.voteAgreement(item.id, true); notify(`已同意「${item.title}」，还需 ${store.members.length - count - 1} 位室友确认`) }}><ThumbsUp size={15} /> 同意</button>
-                )}
+                    </>
+                  )}
+                </div>
               </article>
             )
           })}
@@ -169,6 +245,16 @@ export function Agreements() {
       {showPropose && (
         <Modal title="发起新公约" onClose={() => setShowPropose(false)}>
           <ProposeModal onClose={() => setShowPropose(false)} />
+        </Modal>
+      )}
+      {editAgreement && (
+        <Modal title="修改公约" onClose={() => setEditAgreement(null)}>
+          <EditModal agreement={editAgreement} onClose={() => setEditAgreement(null)} />
+        </Modal>
+      )}
+      {historyAgreement && (
+        <Modal title="版本历史" onClose={() => setHistoryAgreement(null)}>
+          <HistoryModal agreement={historyAgreement} onClose={() => setHistoryAgreement(null)} />
         </Modal>
       )}
     </div>

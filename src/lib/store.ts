@@ -5,6 +5,7 @@ import type {
   ActivityEvent,
   AddExpenseInput,
   Agreement,
+  AgreementVersion,
   AgreementVote,
   AppData,
   BillReminder,
@@ -184,6 +185,7 @@ export function createSeedData(): AppData {
     billReminders,
     agreements,
     votes,
+    agreementVersions: [],
     activities,
     currentUserId: MEMBER_ZHOU,
     splitRule: { mode: 'equal', participantIds: [] },
@@ -195,7 +197,7 @@ export interface AppState extends AppData {
   deleteExpense: (expenseId: ID) => void
   settleShare: (expenseId: ID, shareId: ID) => void
   settleAll: () => void
-  completeChore: (taskId: ID) => void
+  completeChore: (taskId: ID, note?: string) => void
   generateNextWeek: () => void
   swapChore: (taskId: ID, withMemberId: ID) => void
   respondSwapRequest: (requestId: ID, accept: boolean) => void
@@ -206,6 +208,7 @@ export interface AppState extends AppData {
   deleteSupply: (supplyId: ID) => void
   proposeAgreement: (title: string, content: string, category: string, icon: string) => void
   deleteAgreement: (agreementId: ID) => void
+  updateAgreement: (agreementId: ID, title: string, content: string) => void
   voteAgreement: (agreementId: ID, agree: boolean) => void
   remindAgreement: (agreementId: ID, memberId: ID) => void
   addMember: (name: string) => void
@@ -335,14 +338,17 @@ export const useStore = create<AppState>()(
           return { shares, activities: [activity, ...state.activities] }
         })
       },
-      completeChore: (taskId) => {
+      completeChore: (taskId, note) => {
         set((state) => {
           const task = state.choreTasks.find((c) => c.id === taskId)
           if (!task) return {}
           if (task.assigneeId !== state.currentUserId) return {}
           const now = new Date().toISOString()
+          const cleanNote = note?.trim()
           const choreTasks = state.choreTasks.map((c) =>
-            c.id === taskId ? { ...c, status: 'done' as const, completedAt: now, completedBy: state.currentUserId } : c,
+            c.id === taskId
+              ? { ...c, status: 'done' as const, completedAt: now, completedBy: state.currentUserId, note: cleanNote || undefined }
+              : c,
           )
           const activity: ActivityEvent = {
             id: uid('a'),
@@ -350,7 +356,7 @@ export const useStore = create<AppState>()(
             actorId: state.currentUserId,
             type: 'chore_done',
             targetId: taskId,
-            summary: `完成了${task.title}`,
+            summary: cleanNote ? `完成了${task.title}（备注：${cleanNote}）` : `完成了${task.title}`,
             at: now,
           }
           return { choreTasks, activities: [activity, ...state.activities] }
@@ -678,6 +684,45 @@ export const useStore = create<AppState>()(
           }
         })
       },
+      updateAgreement: (agreementId, title, content) => {
+        set((state) => {
+          const agreement = state.agreements.find((a) => a.id === agreementId)
+          if (!agreement) return {}
+          if (agreement.createdBy !== state.currentUserId) return {}
+          const now = new Date().toISOString()
+          const historyEntry: AgreementVersion = {
+            id: uid('av'),
+            agreementId,
+            title: agreement.title,
+            content: agreement.content,
+            version: agreement.version,
+            editedBy: agreement.createdBy,
+            editedAt: agreement.createdAt,
+          }
+          const newVersion = agreement.version + 1
+          const agreements = state.agreements.map((a) =>
+            a.id === agreementId
+              ? { ...a, title, content, version: newVersion, status: 'voting' as const, effectiveAt: undefined }
+              : a,
+          )
+          const votes = state.votes.filter((v) => v.agreementId !== agreementId)
+          const activity: ActivityEvent = {
+            id: uid('a'),
+            houseId: state.house.id,
+            actorId: state.currentUserId,
+            type: 'agreement_proposed',
+            targetId: agreementId,
+            summary: `修改了公约「${title}」（v${newVersion}），需全员重新确认`,
+            at: now,
+          }
+          return {
+            agreements,
+            agreementVersions: [...state.agreementVersions, historyEntry],
+            votes,
+            activities: [activity, ...state.activities],
+          }
+        })
+      },
       voteAgreement: (agreementId, agree) => {
         set((state) => {
           const agreement = state.agreements.find((a) => a.id === agreementId)
@@ -836,7 +881,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'cohome:store',
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         house: state.house,
@@ -851,6 +896,7 @@ export const useStore = create<AppState>()(
         billReminders: state.billReminders,
         agreements: state.agreements,
         votes: state.votes,
+        agreementVersions: state.agreementVersions,
         activities: state.activities,
         currentUserId: state.currentUserId,
         splitRule: state.splitRule,

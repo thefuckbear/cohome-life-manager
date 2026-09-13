@@ -87,6 +87,7 @@ export interface ChoreTask {
   completedAt?: string
   completedBy?: ID
   swappedFromId?: ID
+  note?: string
 }
 
 export type SwapStatus = 'pending' | 'accepted' | 'rejected'
@@ -155,6 +156,16 @@ export interface AgreementVote {
   votedAt: string
 }
 
+export interface AgreementVersion {
+  id: ID
+  agreementId: ID
+  title: string
+  content: string
+  version: number
+  editedBy: ID
+  editedAt: string
+}
+
 export type ActivityType =
   | 'expense_added'
   | 'expense_settled'
@@ -199,6 +210,7 @@ export interface AppData {
   billReminders: BillReminder[]
   agreements: Agreement[]
   votes: AgreementVote[]
+  agreementVersions: AgreementVersion[]
   activities: ActivityEvent[]
   currentUserId: ID
   splitRule: SplitRule
