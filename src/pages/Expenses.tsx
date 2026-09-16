@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ArrowUpRight,
   BellRing,
@@ -419,12 +420,21 @@ export function Expenses() {
   const store = useStore()
   const self = getSelf(store)
   const selfId = self?.id ?? ''
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(false)
   const [showRule, setShowRule] = useState(false)
   const [showRecharge, setShowRecharge] = useState(false)
   const [detailId, setDetailId] = useState<ID | null>(null)
   const [filter, setFilter] = useState<ExpenseCategory | 'all'>('all')
   const [showBill, setShowBill] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('recharge') === '1') {
+      setShowRecharge(true)
+      searchParams.delete('recharge')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const payable = payableFor(store, selfId)
   const total = expenseTotal(store)

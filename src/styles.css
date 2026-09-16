@@ -669,3 +669,31 @@ h1, h2, h3, p { margin: 0; }
 [data-theme='dark'] .tag--warm { color: #f0c07e; }
 [data-theme='dark'] .tag--danger { color: #f0a48c; }
 [data-theme='dark'] .table-row__main strong, [data-theme='dark'] .task-body strong, [data-theme='dark'] .roommate strong, [data-theme='dark'] .agreement-copy h3, [data-theme='dark'] .supply-card h3, [data-theme='dark'] .chore-card__body strong, [data-theme='dark'] .detail-row__main strong, [data-theme='dark'] .settlement-row strong, [data-theme='dark'] .notif-row__main strong, [data-theme='dark'] .activity p strong { color: #eef3f0; }
+
+/* ============ 首页可交互卡片 + 默契分弹窗 ============ */
+.summary-card--clickable { cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.summary-card--clickable:hover { transform: translateY(-2px); border-color: #c9d6ce; box-shadow: 0 10px 26px rgba(43, 58, 50, .09); }
+[data-theme='dark'] .summary-card--clickable:hover { border-color: #4a574f; }
+
+.score-summary { padding: 4px 0 12px; text-align: center; }
+.score-big { display: block; font-size: 34px; color: #2a3831; }
+.score-big span { margin-left: 3px; font-size: 13px; color: #7f8a83; }
+.score-summary p { margin-top: 6px; color: #7f8a83; font-size: 11px; }
+.score-formula { margin: 6px 0 12px; padding: 10px 13px; border-radius: 11px; background: #f3f6f2; }
+.score-items { display: flex; flex-direction: column; gap: 8px; }
+.score-item { padding: 9px 12px; display: flex; align-items: center; gap: 12px; border: 1px solid #e9e8e1; border-radius: 11px; background: white; }
+.score-item__main { flex: 1; min-width: 0; }
+.score-item__main strong { display: block; font-size: 12px; }
+.score-item__main span { display: block; margin-top: 2px; color: #8f9a93; font-size: 10px; line-height: 1.5; }
+.score-item__delta { font-size: 13px; color: #57635c; white-space: nowrap; }
+.score-item__delta--plus { color: #4e7a64; }
+.score-item__delta--minus { color: #bd6547; }
+[data-theme='dark'] .score-big { color: #eef3f0; }
+[data-theme='dark'] .score-big span { color: #b9c4bd; }
+[data-theme='dark'] .score-summary p { color: #b9c4bd; }
+[data-theme='dark'] .score-formula { background: #242c28; }
+[data-theme='dark'] .score-item { background: #242c28; border-color: #2b352f; }
+[data-theme='dark'] .score-item__main span { color: #a8b3ac; }
+[data-theme='dark'] .score-item__delta { color: #ccd6d0; }
+[data-theme='dark'] .score-item__delta--plus { color: #8fc9a5; }
+[data-theme='dark'] .score-item__delta--minus { color: #e8937a; }

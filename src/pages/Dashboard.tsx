@@ -20,6 +20,7 @@ import {
   getMember,
   getSelf,
   greeting,
+  harmonyScore,
   myChoreThisWeek,
   myChoreToday,
   payableFor,
@@ -64,11 +65,47 @@ function AddMemberModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function ScoreModal({ onClose }: { onClose: () => void }) {
+  const store = useStore()
+  const harmony = harmonyScore(store)
+
+  return (
+    <div>
+      <div className="score-summary">
+        <strong className="score-big">{harmony.score}<span>分</span></strong>
+        <p>本周合住默契分 · 满分 100，反映全屋配合度，每周动态变化</p>
+      </div>
+      <div className="score-formula">
+        <p className="form-label" style={{ color: '#7f8a83' }}>计算公式：基础 70 分 + 值日按时完成（最多 +20）+ 公约全员共识（最多 +10）− 逾期值日（每项 -8）− 未结清分摊（每笔 -2）− 逾期缴费（每项 -5），只看及时性、不看金额。</p>
+      </div>
+      <div className="score-items">
+        {harmony.items.map((item) => (
+          <div className="score-item" key={item.label}>
+            <div className="score-item__main">
+              <strong>{item.label}</strong>
+              <span>{item.detail}</span>
+            </div>
+            <strong className={item.delta > 0 ? 'score-item__delta score-item__delta--plus' : item.delta < 0 ? 'score-item__delta score-item__delta--minus' : 'score-item__delta'}>
+              {item.delta > 0 ? `+${item.delta}` : item.delta}
+            </strong>
+          </div>
+        ))}
+      </div>
+      <div className="modal__footer">
+        <button className="button button--secondary" type="button" onClick={onClose}>关闭</button>
+      </div>
+    </div>
+  )
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const store = useStore()
   const self = getSelf(store)
   const [showAddMember, setShowAddMember] = useState(false)
+  const [showScore, setShowScore] = useState(false)
+
+  const harmony = harmonyScore(store)
 
   const myPending = self ? pendingSharesFor(store, self.id) : []
   const myPayable = self ? payableFor(store, self.id) : { total: 0, count: 0 }
@@ -140,29 +177,29 @@ export function Dashboard() {
       </section>
 
       <section className="summary-grid">
-        <article className="summary-card summary-card--balance">
+        <article className="summary-card summary-card--balance summary-card--clickable" onClick={() => navigate('/expenses?recharge=1')}>
           <div className="summary-card__top"><span className="summary-icon"><CircleDollarSign size={21} /></span><span className="tag tag--warm">钱包</span></div>
           <span className="summary-label">我的余额</span>
           <strong className="summary-value">¥{yuan(self?.balance ?? 0)}</strong>
-          <span className="summary-note">{myPayable.total > 0 ? `待结算 ¥${yuan(myPayable.total)} · ${myPayable.count} 笔` : '目前没有待结算费用'}</span>
+          <span className="summary-note">点击充值，余额不足时结清会被拒绝</span>
         </article>
-        <article className="summary-card">
+        <article className="summary-card summary-card--clickable" onClick={() => navigate('/chores')}>
           <div className="summary-card__top"><span className="summary-icon summary-icon--lavender"><CalendarDays size={21} /></span><span className="tag">本周</span></div>
           <span className="summary-label">我的值日</span>
           <strong className="summary-value summary-value--text">{myChore ? myChore.title : '本周无排班'}</strong>
-          <span className="summary-note"><Clock3 size={14} /> {myChore ? `${new Date(myChore.dueAt).getHours().toString().padStart(2, '0')}:00 前完成` : '自觉认领一个吧'}</span>
+          <span className="summary-note"><Clock3 size={14} /> {myChore ? `${new Date(myChore.dueAt).getHours().toString().padStart(2, '0')}:00 前完成` : '点击去认领一个'}</span>
         </article>
-        <article className="summary-card">
-          <div className="summary-card__top"><span className="summary-icon summary-icon--peach"><Box size={21} /></span><span className="tag tag--success">自愿登记</span></div>
-          <span className="summary-label">公共物品</span>
-          <strong className="summary-value summary-value--text">{store.supplies.length} 件公共物品</strong>
-          <span className="summary-note">{store.supplies.length ? '登记即生成 AA 账单' : '还没有登记'}</span>
+        <article className="summary-card summary-card--clickable" onClick={() => navigate('/expenses')}>
+          <div className="summary-card__top"><span className="summary-icon summary-icon--peach"><ReceiptText size={21} /></span><span className="tag tag--danger">待还</span></div>
+          <span className="summary-label">我的欠款</span>
+          <strong className="summary-value">¥{yuan(myPayable.total)}</strong>
+          <span className="summary-note">{myPayable.total > 0 ? `共 ${myPayable.count} 笔待结清，点击去还` : '无欠款，账目清爽'}</span>
         </article>
-        <article className="summary-card summary-card--score">
-          <div className="summary-card__top"><span className="summary-icon summary-icon--green"><Sparkles size={21} /></span><span className="tag tag--success">+6</span></div>
+        <article className="summary-card summary-card--score summary-card--clickable" onClick={() => setShowScore(true)}>
+          <div className="summary-card__top"><span className="summary-icon summary-icon--green"><Sparkles size={21} /></span><span className="tag tag--success">周榜</span></div>
           <span className="summary-label">本周合住默契</span>
-          <strong className="summary-value">86<span className="summary-unit">分</span></strong>
-          <span className="summary-note">继续保持，配合得很棒</span>
+          <strong className="summary-value">{harmony.score}<span className="summary-unit">分</span></strong>
+          <span className="summary-note">点击查看计算规则</span>
         </article>
       </section>
 
@@ -240,6 +277,11 @@ export function Dashboard() {
       {showAddMember && (
         <Modal title="邀请新室友" onClose={() => setShowAddMember(false)}>
           <AddMemberModal onClose={() => setShowAddMember(false)} />
+        </Modal>
+      )}
+      {showScore && (
+        <Modal title="默契分计算规则" onClose={() => setShowScore(false)}>
+          <ScoreModal onClose={() => setShowScore(false)} />
         </Modal>
       )}
     </div>

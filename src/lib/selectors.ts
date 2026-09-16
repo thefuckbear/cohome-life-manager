@@ -406,3 +406,77 @@ export function expenseStatus(state: AppData, expense: Expense, selfId: ID): Exp
   if (unsettled.some((s) => s.memberId === selfId)) return { label: '待我结算', kind: 'danger' }
   return { label: `${payees.size} 人待结算`, kind: 'warm' }
 }
+
+export interface HarmonyItem {
+  label: string
+  delta: number
+  detail: string
+}
+
+export interface HarmonyBreakdown {
+  score: number
+  items: HarmonyItem[]
+}
+
+/**
+ * 本周合住默契分（0-100，全屋配合度）：
+ * 基础 70 + 值日按时完成率×20 - 逾期值日×8 - 未结清分摊×2 - 逾期缴费×5 + 公约全员确认率×10
+ * 设计原则：只看及时性与配合，不看金额（借鉴 SynergySplit 的 Harmony Index 思路）
+ */
+export function harmonyScore(state: AppData): HarmonyBreakdown {
+  const members = scoped(state, state.members)
+  const tasks = choresForWeek(state, 0)
+  const doneCount = tasks.filter((t) => t.status === 'done').length
+  const overdueTasks = tasks.filter(
+    (t) => t.status === 'pending' && new Date(t.dueAt).getTime() < Date.now(),
+  ).length
+  const pendingShares = scoped(state, state.shares).filter((s) => !s.settled).length
+  const overdueBills = scoped(state, state.billReminders).filter(
+    (b) => b.status === 'pending' && daysLeft(b) < 0,
+  ).length
+  const agreements = scoped(state, state.agreements).filter((a) => a.status === 'voting' || a.status === 'active')
+  const votes = scoped(state, state.votes)
+  const confirmed = agreements.filter((a) => {
+    const voters = new Set(votes.filter((v) => v.agreementId === a.id).map((v) => v.memberId))
+    return members.every((m) => voters.has(m.id))
+  }).length
+  const confirmRate = agreements.length ? confirmed / agreements.length : 1
+
+  const choreDelta = tasks.length ? round2((doneCount / tasks.length) * 20) : 0
+  const overdueTaskDelta = -overdueTasks * 8
+  const pendingShareDelta = -pendingShares * 2
+  const overdueBillDelta = -overdueBills * 5
+  const agreeDelta = round2(confirmRate * 10)
+
+  const items: HarmonyItem[] = [
+    { label: '基础分', delta: 70, detail: '每位室友从 70 分起步' },
+    {
+      label: '值日完成',
+      delta: choreDelta,
+      detail: tasks.length ? `本周 ${doneCount}/${tasks.length} 项值日按时完成（+${choreDelta.toFixed(1)}）` : '本周暂无排班（不加不减）',
+    },
+    {
+      label: '逾期值日',
+      delta: overdueTaskDelta,
+      detail: overdueTasks ? `${overdueTasks} 项值日逾期，每项 -8` : '无逾期值日',
+    },
+    {
+      label: '未结清账单',
+      delta: pendingShareDelta,
+      detail: pendingShares ? `${pendingShares} 笔分摊未结清，每笔 -2` : '账单全部结清',
+    },
+    {
+      label: '逾期缴费',
+      delta: overdueBillDelta,
+      detail: overdueBills ? `${overdueBills} 项共同缴费逾期，每项 -5` : '无逾期缴费',
+    },
+    {
+      label: '公约共识',
+      delta: agreeDelta,
+      detail: agreements.length ? `全员确认的公约 ${confirmed}/${agreements.length}（+${agreeDelta.toFixed(1)}）` : '暂无公约（按满分计）',
+    },
+  ]
+  const raw = items.reduce((sum, i) => sum + i.delta, 0)
+  const score = Math.max(0, Math.min(100, Math.round(raw)))
+  return { score, items }
+}
