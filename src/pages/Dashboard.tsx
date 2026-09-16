@@ -16,14 +16,13 @@ import { Modal } from '../components/Modal'
 import { notify } from '../lib/placeholder'
 import {
   agreementAwaitingSelf,
-  computeNetBalances,
   daysLeft,
   getMember,
   getSelf,
   greeting,
   myChoreThisWeek,
   myChoreToday,
-  payeesCountFor,
+  payableFor,
   pendingSharesFor,
   timeAgo,
   todayLabel,
@@ -71,9 +70,8 @@ export function Dashboard() {
   const self = getSelf(store)
   const [showAddMember, setShowAddMember] = useState(false)
 
-  const net = computeNetBalances(store)
-  const selfNet = self ? (net[self.id] ?? 0) : 0
   const myPending = self ? pendingSharesFor(store, self.id) : []
+  const myPayable = self ? payableFor(store, self.id) : { total: 0, count: 0 }
   const myChore = self ? myChoreThisWeek(store, self.id) : undefined
   const myToday = self ? myChoreToday(store, self.id) : undefined
   const pendingAgreement = self ? agreementAwaitingSelf(store, self.id) : undefined
@@ -143,10 +141,10 @@ export function Dashboard() {
 
       <section className="summary-grid">
         <article className="summary-card summary-card--balance">
-          <div className="summary-card__top"><span className="summary-icon"><CircleDollarSign size={21} /></span><span className="tag tag--warm">待结算</span></div>
-          <span className="summary-label">我的合租余额</span>
-          <strong className="summary-value">{selfNet < 0 ? `- ¥${yuan(-selfNet)}` : `+ ¥${yuan(selfNet)}`}</strong>
-          <span className="summary-note">{selfNet < 0 ? `你需要支付给 ${payeesCountFor(store, self!.id)} 位室友` : '目前没有待结算费用'}</span>
+          <div className="summary-card__top"><span className="summary-icon"><CircleDollarSign size={21} /></span><span className="tag tag--warm">钱包</span></div>
+          <span className="summary-label">我的余额</span>
+          <strong className="summary-value">¥{yuan(self?.balance ?? 0)}</strong>
+          <span className="summary-note">{myPayable.total > 0 ? `待结算 ¥${yuan(myPayable.total)} · ${myPayable.count} 笔` : '目前没有待结算费用'}</span>
         </article>
         <article className="summary-card">
           <div className="summary-card__top"><span className="summary-icon summary-icon--lavender"><CalendarDays size={21} /></span><span className="tag">本周</span></div>

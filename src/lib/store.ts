@@ -1097,7 +1097,7 @@ export const useStore = create<AppState>()(
     },
     {
       name: 'cohome:store',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         houses: state.houses,
