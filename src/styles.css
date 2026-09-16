@@ -55,6 +55,7 @@ button { color: inherit; }
 .profile-mini__switch { display: flex; align-items: center; gap: 3px; padding: 0; color: #8a928d; border: 0; background: transparent; cursor: pointer; font-size: 9px; font-weight: 600; white-space: nowrap; }
 .profile-mini__switch:hover { color: var(--green); }
 .account-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); padding: 8px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #e5e4da; border-radius: 14px; background: #fffefa; box-shadow: 0 16px 40px rgba(32, 45, 38, .16); z-index: 40; }
+.account-menu--down { top: calc(100% + 8px); bottom: auto; }
 .account-menu__caption { padding: 2px 8px 4px; color: #9aa09c; font-size: 8px; }
 .account-menu__item { padding: 8px 9px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; font-size: 11px; font-weight: 600; color: #57635c; }
 .account-menu__item:hover { background: #f1f3ed; }
@@ -647,17 +648,24 @@ h1, h2, h3, p { margin: 0; }
 [data-theme='dark'] .agreement-banner small,
 [data-theme='dark'] .agreement-banner p,
 [data-theme='dark'] .payer-fixed strong {
-  color: #c4cec8;
+  color: #dde6e0;
 }
-[data-theme='dark'] .brand span { color: #aeb9b2; }
-[data-theme='dark'] .nav-caption { color: #9aa59e; }
-[data-theme='dark'] .home-switcher small { color: #a8b2ac; }
-[data-theme='dark'] .profile-mini__switch { color: #aeb9b2; }
-[data-theme='dark'] .sidebar__status strong { color: #dbe4de; }
-[data-theme='dark'] .topbar__profile strong { color: #dbe4de; }
-[data-theme='dark'] .profile-mini strong { color: #dbe4de; }
-[data-theme='dark'] .activity p { color: #b4bfb8; }
-[data-theme='dark'] .activity p strong { color: #e8eeea; }
-[data-theme='dark'] .agreement-copy h3 { color: #e8eeea; }
-[data-theme='dark'] .detail-summary h3 { color: #e8eeea; }
-[data-theme='dark'] .version-row > p { color: #b4bfb8; }
+[data-theme='dark'] .brand span { color: #ccd6d0; }
+[data-theme='dark'] .nav-caption { color: #b9c4bd; }
+[data-theme='dark'] .home-switcher small { color: #ccd6d0; }
+[data-theme='dark'] .profile-mini__switch { color: #ccd6d0; }
+[data-theme='dark'] .sidebar__status strong { color: #eef3f0; }
+[data-theme='dark'] .topbar__profile strong { color: #eef3f0; }
+[data-theme='dark'] .profile-mini strong { color: #eef3f0; }
+[data-theme='dark'] .activity p { color: #d3dcd6; }
+[data-theme='dark'] .activity p strong { color: #f4f8f5; }
+[data-theme='dark'] .agreement-copy h3 { color: #f4f8f5; }
+[data-theme='dark'] .detail-summary h3 { color: #f4f8f5; }
+[data-theme='dark'] .version-row > p { color: #d3dcd6; }
+[data-theme='dark'] .nav-item { color: #ccd6d0; }
+[data-theme='dark'] .tag { color: #ccd6d0; }
+[data-theme='dark'] .modal__close { color: #c2ccc6; }
+[data-theme='dark'] .tag--success { color: #a5d4b8; }
+[data-theme='dark'] .tag--warm { color: #f0c07e; }
+[data-theme='dark'] .tag--danger { color: #f0a48c; }
+[data-theme='dark'] .table-row__main strong, [data-theme='dark'] .task-body strong, [data-theme='dark'] .roommate strong, [data-theme='dark'] .agreement-copy h3, [data-theme='dark'] .supply-card h3, [data-theme='dark'] .chore-card__body strong, [data-theme='dark'] .detail-row__main strong, [data-theme='dark'] .settlement-row strong, [data-theme='dark'] .notif-row__main strong, [data-theme='dark'] .activity p strong { color: #eef3f0; }

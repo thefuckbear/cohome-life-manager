@@ -146,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span><small>当前合租屋</small><strong>{currentHouse?.name ?? '合租屋'}</strong></span>
           <ChevronDown size={16} />
           {showHouseMenu && (
-            <div className="account-menu">
+            <div className="account-menu account-menu--down">
               <span className="account-menu__caption">我的合租屋</span>
               {store.houses.map((h) => (
                 <button

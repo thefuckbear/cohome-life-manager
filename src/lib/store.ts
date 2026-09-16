@@ -98,7 +98,7 @@ export function createSeedData(): AppData {
   ]
 
   const members: Member[] = [
-    { id: MEMBER_ZHOU, houseId: HOUSE_ID, name: '小周', initials: '周', color: '#e6a25a', isSelf: true, role: 'member', joinedAt: toISO(addDays(now, -128)), status: '在家', balance: 100 },
+    { id: MEMBER_ZHOU, houseId: HOUSE_ID, name: '小周', initials: '周', color: '#e6a25a', isSelf: true, role: 'member', joinedAt: toISO(addDays(now, -128)), status: '在家', balance: 0 },
     { id: MEMBER_LIN, houseId: HOUSE_ID, name: '小林', initials: '林', color: '#6f9a83', isSelf: false, role: 'member', joinedAt: toISO(addDays(now, -128)), status: '外出', balance: 0 },
     { id: MEMBER_XIA, houseId: HOUSE_ID, name: '小夏', initials: '夏', color: '#7d83b7', isSelf: false, role: 'owner', joinedAt: toISO(addDays(now, -128)), status: '在家', balance: 0 },
   ]

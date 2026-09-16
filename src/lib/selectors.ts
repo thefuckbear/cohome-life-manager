@@ -13,9 +13,10 @@ import type {
   TransferRecord,
 } from './types'
 
-/** 浮点金额保留两位小数（分精度），所有金额出入口都过一遍 */
+/** 浮点金额保留两位小数（分精度），所有金额出入口都过一遍；结果归零（消除 -0） */
 export function round2(x: number): number {
-  return Math.round((x + Number.EPSILON) * 100) / 100
+  const r = Math.round((x + Number.EPSILON) * 100) / 100
+  return r === 0 ? 0 : r
 }
 
 /** 按当前合租屋过滤实体集合（多合租屋支持） */
