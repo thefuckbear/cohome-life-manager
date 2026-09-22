@@ -228,6 +228,22 @@ export interface SplitRule {
   participantIds: ID[]
 }
 
+/** AI 小助手：回答里的可点击跳转按钮 */
+export interface AssistantRoute {
+  path: string
+  label: string
+}
+
+/** AI 小助手：一条聊天消息（content 为已剥离跳转标记的纯文本） */
+export interface AssistantMessage {
+  id: ID
+  role: 'user' | 'assistant'
+  content: string
+  routes: AssistantRoute[]
+  isError?: boolean
+  createdAt: string
+}
+
 export interface AppData {
   houses: House[]
   currentHouseId: ID
@@ -248,4 +264,7 @@ export interface AppData {
   activities: ActivityEvent[]
   currentUserId: ID
   splitRule: SplitRule
+  /** AI 小助手：用户自填的 DeepSeek API Key（BYOK，仅存本机浏览器） */
+  assistantKey: string
+  assistantMessages: AssistantMessage[]
 }

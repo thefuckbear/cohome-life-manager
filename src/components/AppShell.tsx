@@ -4,6 +4,7 @@ import {
   BellRing,
   BookOpen,
   BookOpenCheck,
+  Bot,
   Box,
   CalendarDays,
   CheckCircle2,
@@ -29,6 +30,7 @@ const navigation = [
   { to: '/chores', label: '清洁值日', icon: ClipboardCheck },
   { to: '/supplies', label: '公共物品', icon: Box },
   { to: '/agreements', label: '室友公约', icon: BookOpenCheck },
+  { to: '/assistant', label: '小助手', icon: Bot },
   { to: '/guide', label: '使用说明', icon: BookOpen },
   { to: '/settings', label: '设置', icon: SettingsIcon },
 ]
@@ -206,6 +208,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="topbar">
           <div className="mobile-brand"><Brand /></div>
           <div className="topbar__spacer" />
+          <button className="icon-button" aria-label="AI 小助手" onClick={() => navigate('/assistant')}>
+            <Bot size={19} />
+          </button>
           <button className="icon-button" aria-label="通知中心" onClick={() => setShowNotif(true)}>
             <Bell size={19} />
             {notifs.length > 0 && <span className="notification-dot" />}
@@ -219,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="mobile-nav" aria-label="移动端主导航">
-        {navigation.map(({ to, label, icon: Icon }) => (
+        {navigation.filter((n) => n.to !== '/assistant').map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `mobile-nav__item${isActive ? ' is-active' : ''}`}>
             <Icon size={20} />
             <span>{label.replace('公共', '').replace('室友', '')}</span>

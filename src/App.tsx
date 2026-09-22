@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { Agreements } from './pages/Agreements'
+import { Assistant } from './pages/Assistant'
 import { Chores } from './pages/Chores'
 import { Dashboard } from './pages/Dashboard'
 import { Expenses } from './pages/Expenses'
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/chores" element={<Chores />} />
         <Route path="/supplies" element={<Supplies />} />
         <Route path="/agreements" element={<Agreements />} />
+        <Route path="/assistant" element={<Assistant />} />
         <Route path="/guide" element={<Guide />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -697,3 +697,77 @@ h1, h2, h3, p { margin: 0; }
 [data-theme='dark'] .score-item__delta { color: #ccd6d0; }
 [data-theme='dark'] .score-item__delta--plus { color: #8fc9a5; }
 [data-theme='dark'] .score-item__delta--minus { color: #e8937a; }
+
+/* ============ AI 小助手 ============ */
+.assistant-panel { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.assistant-panel__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 17px; border-bottom: 1px solid #ecece4; }
+.assistant-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; background: #eef4ef; color: #4e7a64; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.assistant-chat { flex: 1; min-height: 320px; max-height: 58vh; overflow-y: auto; padding: 16px 17px; display: flex; flex-direction: column; gap: 12px; background: #faf9f5; }
+.assistant-empty { margin: auto; text-align: center; color: #9aa49d; }
+.assistant-empty svg { color: #8fae9b; }
+.assistant-empty p { margin-top: 10px; font-size: 13px; line-height: 1.8; }
+.assistant-empty strong { color: #4e7a64; }
+.assistant-msg { display: flex; flex-direction: column; max-width: 88%; align-self: flex-start; }
+.assistant-msg--user { align-self: flex-end; align-items: flex-end; }
+.assistant-bubble { padding: 10px 13px; border-radius: 14px 14px 14px 4px; background: white; border: 1px solid #e6e5dd; color: #2a3831; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.assistant-msg--user .assistant-bubble { background: var(--green); border-color: var(--green); color: white; border-radius: 14px 14px 4px 14px; }
+.assistant-msg--error .assistant-bubble { background: #fdf3ef; border-color: #f0d3c8; color: #a2543a; }
+.assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; background: #4e7a64; vertical-align: -2px; animation: assistant-blink 1s steps(2) infinite; }
+@keyframes assistant-blink { 50% { opacity: 0; } }
+.assistant-routes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.assistant-route { padding: 6px 12px; border: none; border-radius: 999px; background: var(--green); color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: filter .15s ease; }
+.assistant-route:hover { filter: brightness(1.06); }
+.assistant-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 17px 0; }
+.assistant-chip { padding: 6px 12px; border: 1px solid #d8e2da; border-radius: 999px; background: #f2f7f3; color: #3f5549; font-size: 12px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.assistant-chip:hover { border-color: #b7cbbd; background: #e9f2eb; }
+.assistant-chip:disabled { opacity: .5; cursor: default; }
+.assistant-inputbar { display: flex; gap: 8px; padding: 12px 17px; border-top: 1px solid #ecece4; background: white; }
+.assistant-inputbar .form-input { flex: 1; }
+.assistant-inputbar .button { flex-shrink: 0; }
+
+.assistant-offline { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid #e3e6df; border-radius: 14px; background: #f6f9f5; }
+.assistant-offline__icon { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: var(--green-soft); color: var(--green-dark); flex-shrink: 0; }
+.assistant-offline strong { font-size: 14px; color: #2a3831; }
+.assistant-offline p { margin-top: 4px; font-size: 12px; color: #7f8a83; line-height: 1.7; }
+.assistant-offline .button { flex-shrink: 0; margin-left: auto; }
+.assistant-faq { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.assistant-faq-card { padding: 14px 16px; border: 1px solid #e6e5dd; border-radius: 13px; background: white; }
+.assistant-faq-card strong { display: block; font-size: 13px; color: #2a3831; }
+.assistant-faq-card p { margin-top: 5px; color: #7f8a83; font-size: 12px; line-height: 1.7; }
+
+.assistant-keybox { margin-top: 12px; }
+.assistant-keybox__status { font-size: 13px; color: #57635c; }
+.assistant-keybox__row { display: flex; gap: 8px; margin-top: 10px; }
+.assistant-keybox__row .form-input { flex: 1; }
+.assistant-keybox__row .button { flex-shrink: 0; }
+.assistant-keybox__hint { margin-top: 10px; font-size: 11px; color: #99a09b; line-height: 1.7; }
+
+@media (max-width: 640px) {
+  .assistant-chat { min-height: 260px; max-height: 52vh; }
+  .assistant-offline { flex-direction: column; align-items: flex-start; }
+  .assistant-offline .button { margin-left: 0; width: 100%; justify-content: center; }
+  .assistant-keybox__row { flex-wrap: wrap; }
+  .assistant-keybox__row .form-input { flex-basis: 100%; }
+}
+
+/* --- 小助手深色主题 --- */
+[data-theme='dark'] .assistant-panel__head { border-color: #2b352f; }
+[data-theme='dark'] .assistant-badge { background: #2a3a31; color: #8fc9a5; }
+[data-theme='dark'] .assistant-chat { background: #1b221e; }
+[data-theme='dark'] .assistant-empty p { color: #a8b3ac; }
+[data-theme='dark'] .assistant-empty strong { color: #8fc9a5; }
+[data-theme='dark'] .assistant-bubble { background: #242c28; border-color: #2b352f; color: #dbe4de; }
+[data-theme='dark'] .assistant-msg--user .assistant-bubble { background: var(--green); border-color: var(--green); color: white; }
+[data-theme='dark'] .assistant-msg--error .assistant-bubble { background: #33241f; border-color: #4a332b; color: #e8937a; }
+[data-theme='dark'] .assistant-caret { background: #8fc9a5; }
+[data-theme='dark'] .assistant-chip { border-color: #39443d; background: #242c28; color: #c6d2ca; }
+[data-theme='dark'] .assistant-chip:hover { border-color: #4f5c54; background: #2a332e; }
+[data-theme='dark'] .assistant-inputbar { border-color: #2b352f; background: #202824; }
+[data-theme='dark'] .assistant-offline { border-color: #2b352f; background: #222a26; }
+[data-theme='dark'] .assistant-offline strong { color: #eef3f0; }
+[data-theme='dark'] .assistant-offline p { color: #a8b3ac; }
+[data-theme='dark'] .assistant-faq-card { background: #242c28; border-color: #2b352f; }
+[data-theme='dark'] .assistant-faq-card strong { color: #eef3f0; }
+[data-theme='dark'] .assistant-faq-card p { color: #a8b3ac; }
+[data-theme='dark'] .assistant-keybox__status { color: #ccd6d0; }
+[data-theme='dark'] .assistant-keybox__hint { color: #8f9a93; }

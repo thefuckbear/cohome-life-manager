@@ -8,6 +8,8 @@ import type {
   AgreementVersion,
   AgreementVote,
   AppData,
+  AssistantMessage,
+  AssistantRoute,
   BillCycle,
   BillPayment,
   BillReminder,
@@ -202,6 +204,8 @@ export function createSeedData(): AppData {
     activities,
     currentUserId: MEMBER_ZHOU,
     splitRule: { mode: 'equal', participantIds: [] },
+    assistantKey: '',
+    assistantMessages: [],
   }
 }
 
@@ -236,6 +240,10 @@ export interface AppState extends AppData {
   payBill: (billId: ID) => 'ok' | 'insufficient' | 'already' | 'missing' | 'paid'
   addHouse: (name: string) => void
   switchHouse: (houseId: ID) => void
+  setAssistantKey: (key: string) => void
+  clearAssistantKey: () => void
+  appendAssistantMessage: (input: { role: 'user' | 'assistant'; content: string; routes?: AssistantRoute[]; isError?: boolean }) => void
+  clearAssistantMessages: () => void
   reset: () => void
 }
 
@@ -1092,12 +1100,29 @@ export const useStore = create<AppState>()(
             return { currentHouseId: houseId }
           })
         },
+        setAssistantKey: (key) => set({ assistantKey: key.trim() }),
+        clearAssistantKey: () => set({ assistantKey: '' }),
+        appendAssistantMessage: (input) => {
+          const message: AssistantMessage = {
+            id: uid('am'),
+            role: input.role,
+            content: input.content,
+            routes: input.routes ?? [],
+            isError: input.isError,
+            createdAt: new Date().toISOString(),
+          }
+          set((state) => {
+            const messages = [...state.assistantMessages, message]
+            return { assistantMessages: messages.length > 60 ? messages.slice(messages.length - 60) : messages }
+          })
+        },
+        clearAssistantMessages: () => set({ assistantMessages: [] }),
         reset: () => set({ ...createSeedData() }),
       }
     },
     {
       name: 'cohome:store',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         houses: state.houses,
@@ -1119,6 +1144,8 @@ export const useStore = create<AppState>()(
         activities: state.activities,
         currentUserId: state.currentUserId,
         splitRule: state.splitRule,
+        assistantKey: state.assistantKey,
+        assistantMessages: state.assistantMessages,
       }),
     },
   ),

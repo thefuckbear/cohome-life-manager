@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpenCheck,
+  Bot,
   Box,
   CalendarDays,
   CircleDollarSign,
@@ -79,6 +80,16 @@ const sections = [
       '被室友提醒（催缴、值日、公约）',
       '你有待结算的账单',
       '今天轮到你值日',
+    ],
+  },
+  {
+    icon: Bot,
+    title: 'AI 小助手',
+    desc: '用大白话提问，小助手告诉你「去哪里、点哪里」，回答自带一键跳转按钮。',
+    points: [
+      '在「设置」页填入你自己的 DeepSeek API Key 即可启用',
+      '只提供指引，不会替你操作，数据以页面为准',
+      '未配置 Key 时也能查看离线常见问题',
     ],
   },
 ]

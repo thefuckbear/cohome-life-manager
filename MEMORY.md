@@ -1,6 +1,6 @@
 # 合住 CoHome — 项目交接记忆档案
 
-> 生成日期：2026-09-12（最近更新：2026-09-13）
+> 生成日期：2026-09-12（最近更新：2026-09-19）
 > 用途：将本项目从 Codex/OpenCode 迁移到 **DeepSeek Harness** 继续开发时的完整交接档案。
 > 工作目录：`C:\Users\HY\Desktop\test_meituan\cohome-life-manager`
 > 交接原则：已实现的标注「已完成」，未做的标注「预留/待做」，不把预留说成实现。
@@ -12,7 +12,7 @@
 - **产品**：合租生活管家「合住 CoHome」，移动端优先 Web App，演示家庭「小满之家」，3 位室友（小周/小林/小夏）。
 - **线上 URL**：`https://thefuckbear.github.io/cohome-life-manager/`（已部署最新版，HTTP 200）
 - **技术栈**：React 19 + TypeScript + Vite 6 + React Router 7（HashRouter）+ **Zustand** + lucide-react + 原生 CSS（无 Tailwind/shadcn）。
-- **完成度**：✅ 费用 AA / 清洁值日 / 公共物品 / 室友公约 / 账号鉴权 / 通知中心 / 使用说明 / 缴费日提醒 / 月统计；⏳ P3 场景功能待做（见第 12 节）。
+- **完成度**：✅ 费用 AA / 清洁值日 / 公共物品 / 室友公约 / 账号鉴权 / 通知中心 / 使用说明 / 缴费日提醒 / 月统计 / **AI 小助手（DeepSeek 指引型）**；⏳ P3 场景功能待做（见第 12 节）。
 - **Git 分支**：`main` 是唯一主线；`full-features` 已并入 main（保留为历史）；`gh-pages` 是部署产物分支；旧实现已打 tag `legacy/lightweight-persistence` 归档。
 - **部署**：GitHub Actions 自动部署（`.github/workflows/deploy.yml`）——**push 到 main 自动构建并部署到 gh-pages**，刷新网页（等约 1 分钟 CDN）即见新功能。不再手动 `npm run deploy`。
 
@@ -79,7 +79,8 @@ src/
   styles.css               # 全部样式（原生 CSS，含响应式 + 弹窗/表单）
   lib/
     types.ts               # 全部数据模型类型
-    store.ts               # Zustand store：种子数据 + actions + persist（version 已到 6）
+    store.ts               # Zustand store：种子数据 + actions + persist（version 已到 10）
+    assistant.ts           # AI 小助手：上下文快照/system prompt/SSE 流式解析/跳转标记解析（纯函数，不依赖 store）
     selectors.ts           # 纯函数：派生计算 + 分摊/结算/统计/通知聚合
     placeholder.ts         # PLACEHOLDER_EVENT / NOTIFY_EVENT + triggerPlaceholder / notify
   components/
@@ -92,6 +93,7 @@ src/
     Chores.tsx             # 清洁值日（✅ 完整：认领/两阶段提醒/完成凭证/换班邀请/公平统计/删除）
     Supplies.tsx           # 公共物品（✅ 自愿登记制：登记即生成 AA 账单）
     Agreements.tsx         # 室友公约（✅ 完整：发起/投票生效/一键提醒/版本历史/删除）
+    Assistant.tsx          # AI 小助手（✅ 指引型：流式对话 + 跳转卡 + 离线 FAQ）
     Guide.tsx              # 使用说明（✅ 7 张卡片讲清全部功能）
 ```
 
@@ -134,7 +136,9 @@ src/
 - `ActivityEvent`：id / houseId / actorId / type / targetId / summary / at / **notifyId?**（被通知人）
   - type：`expense_added | expense_settled | expense_reminded | chore_done | chore_rotated | chore_swapped | chore_reminded | supply_restocked | agreement_voted | agreement_reminded | agreement_proposed | member_added`
 - `SplitRule`：mode(equal|custom) / participantIds（空=全员）
-- `AppData`：house / members / expenses / shares / choreRules / choreTasks / swapRequests / supplies / purchases / billReminders / agreements / votes / agreementVersions / activities / **currentUserId** / splitRule
+- `AssistantRoute`：path / label（小助手回答里的跳转按钮，path 限白名单 7 个路由）
+- `AssistantMessage`：id / role(user|assistant) / content（已剥离跳转标记）/ routes / isError? / createdAt
+- `AppData`：house / members / expenses / shares / choreRules / choreTasks / swapRequests / supplies / purchases / billReminders / agreements / votes / agreementVersions / activities / **currentUserId** / splitRule / **assistantKey（BYOK，明文存 localStorage）** / **assistantMessages（上限 60 条）**
 
 ---
 
@@ -166,6 +170,9 @@ src/
 | `addMember(name)` | 邀请新室友 | 任意 |
 | `switchAccount(memberId)` | 切换当前账号 | 任意 |
 | `saveSplitRule(rule)` | 保存默认分摊规则 | 任意 |
+| `setAssistantKey(key)` / `clearAssistantKey()` | 保存/清除 DeepSeek API Key（自动 trim） | 任意 |
+| `appendAssistantMessage(input)` | 追加小助手消息（id 自动生成，超 60 条裁剪） | 任意 |
+| `clearAssistantMessages()` | 清空小助手对话 | 任意 |
 | `reset()` | 重置回种子数据 | 任意 |
 
 种子数据要点（`createSeedData()`，日期相对当前动态生成）：成员小周/小林/小夏；费用电费¥240+抽纸¥45+宽带¥120（→ 小周净应付¥120）；值日 4 任务（2 done 2 pending）+ 1 条换班邀请（小周→小林 pending）；公共物品 4 件（自愿登记）；缴费日 3 条（房租本月25日/水费已逾期/宽带3天后）；公约 3 active + 1 voting（访客规则，小周未投）。
@@ -195,9 +202,13 @@ src/
 
 **Agreements（✅ 完整）**：发起公约；投票（每人限一次，全员同意→生效）；一键提醒（已生效公约）；修改（版本+1、回投票）；版本历史弹窗；删除（创建者）。
 
-**Guide（✅）**：7 张卡片：账号与身份/今日首页/费用 AA/清洁值日/公共物品/室友公约/通知中心。
+**Guide（✅）**：8 张卡片：账号与身份/今日首页/费用 AA/清洁值日/公共物品/室友公约/通知中心/AI 小助手。
 
-**AppShell（✅）**：左侧导航（含使用说明）；左下头像菜单切换账号；右上铃铛通知中心（红点提示，点击跳转）；toast 双类型（预留提示/操作成功）。
+**Assistant（✅ 指引型，2026-09-19）**：DeepSeek 流式对话（SSE）；回答自带跳转卡（`[[route:路径|文案]]` 标记解析 + 白名单校验）；快捷提问 chips；停止生成；错误友好提示（401/402/429 映射中文）；未配置 Key 时显示 6 条离线 FAQ + 去设置按钮。系统提示词注入「应用说明书 + 实时数据快照（余额/待结算/值日/缴费/公约）」；防幻觉规则：只读指引、以快照为准、禁止编造数字。
+
+**Settings（✅）**：浅色/深色主题 + AI 小助手 Key 管理（保存/清除/状态脱敏显示 sk-***后四位）。
+
+**AppShell（✅）**：左侧导航（含使用说明、小助手）；顶栏 Bot 图标直达小助手（移动端底部导航不重复放，走顶栏）；左下头像菜单切换账号；右上铃铛通知中心（红点提示，点击跳转）；toast 双类型（预留提示/操作成功）。
 
 ---
 
@@ -232,18 +243,22 @@ useStore.getState()    // 读更新后的 state 断言
 
 **结论**：每次改动后先 `npm run build`（类型检查），再按「小步 + 每步测试」推进；纯逻辑用 selectors 测试，行为用 store action 测试。
 
+**AI 小助手测试（2026-09-19）**：编译命令多带一个文件——`npx tsc src/lib/types.ts src/lib/selectors.ts src/lib/store.ts src/lib/assistant.ts --outDir .test-tmp …`（patch 脚本 `.test-tmp/patch.mjs` 同步给 assistant.ts 补 `.mjs` 扩展名）。新增 33 项断言：快照/prompt/跳转标记解析（含非法路径丢弃）/SSE mock 流（含跨块切分、错误体）/友好错误映射/store 行为（trim、清空、60 条裁剪）/回归冒烟。真接口联调脚本 `.test-tmp/check-deepseek.mjs`：读 `.test-tmp/dev.key`（一次性，用完删目录），验证 CORS 预检（allow-origin 回显请求源、allow-headers 含 content-type,authorization）+ 真实流式对话 + 跳转标记输出。`.test-tmp` 与 `*.key` 已加入 .gitignore。
+
 ---
 
 ## 12. 下一步计划（待办，按优先级）
 
 - [x] P1：温和催缴 / 月度账单统计 / 缴费日提醒
 - [x] P2：值日完成凭证 / 值日公平统计 / 公约版本历史
+- [x] AI 小助手（指引型 MVP，2026-09-19）：DeepSeek BYOK + SSE 流式 + 跳转卡 + 离线 FAQ
 - [ ] P3（待用户确认后再做）：
   1. 退租结算：成员退出时的费用清算方案
   2. 访客/留宿登记：谁家客人常住导致水电上涨
   3. 公共基金池：每人每月预存虚拟金额，公共支出从基金扣
   4. 留言板/公告：应用内公告替代群聊消息
 - 每个模块先写 store action + selectors + 单测，再改页面；push main 自动部署。
+- AI 小助手后续（可选，未排期）：Phase 3 可执行动作（function calling + 确认卡，「帮我记一笔」→ 确认 → 入账）；Phase 4 换 Cloudflare Worker 代理去 Key（前端调用层不变，只换 baseURL）。
 
 ---
 
@@ -264,3 +279,16 @@ useStore.getState()    // 读更新后的 state 断言
 - 明确区分「已完成 / 已验证 / 预留 / 仅诊断」。
 - 改完代码 `npm run build` 验证；纯逻辑补 selectors 单测，行为补 store action 单测。
 - **部署自动化**：完成功能后自主 commit + push 到 main（CI 自动部署），用户刷新网页即可测试，无需再问是否部署。
+
+---
+
+## 15. AI 小助手架构备忘（2026-09-19 新增，接手者必读）
+
+- **定位**：指引型（只教不代做）。产品方案为 4 阶段路线图（PM 设计）：Phase 1 指引型 MVP（已完成）→ Phase 2 上下文注入（已随 MVP 一起做）→ Phase 3 可执行动作（未做）→ Phase 4 Worker 代理去 Key（未做）。
+- **密钥方案**：BYOK——用户自填 DeepSeek Key，存 localStorage（zustand persist `assistantKey` 字段），直连 `https://api.deepseek.com`。**CORS 已实测允许浏览器直连**（预检 200，allow-origin 回显请求源）。Key 明文存本机浏览器是已知权衡；用户曾把 Key 贴进对话记录，已建议去平台轮换。
+- **模型参数**：`deepseek-chat`，stream: true，temperature 0.4，max_tokens 600。
+- **核心文件**：`src/lib/assistant.ts`（快照/prompt/SSE/标记解析，纯函数不依赖 store，可单测）；`src/pages/Assistant.tsx`（聊天 UI，流式累积用组件局部 state，完成才写入 store，避免 persist 逐 token 写盘）；设置页 Key 管理；`src/lib/types.ts` 的 AssistantMessage/AssistantRoute。
+- **防幻觉三件套**：注入实时快照（复用 selectors：payableFor/pendingSharesFor/myChoreToday/upcomingBills/agreementAwaitingSelf 等）；「以快照为准、禁止编造数字」硬规则；面板副标题固定提示「只提供指引，不会替你操作」。
+- **跳转卡协议**：模型在回答末尾输出 `[[route:路径|按钮文字]]`，`parseRoutes` 白名单校验（/ /expenses /chores /supplies /agreements /guide /settings）后剥离并渲染为按钮；非法路径保留原文不渲染。
+- **已知限制**：模型对按钮位置的描述可能不精确（实测出现过「右下角记一笔」），跳转卡可兜底；流式中途停止会把已生成部分保存为回答；消息历史上限 60 条；`reset()` 会连带清掉 Key 与对话；Key 每次回答都随 Authorization 头直连 DeepSeek（BYOK 预期行为）。
+- **测试**：单测 33 项全绿（2026-09-19）；联调脚本已跑通（CORS + 真实流式 + 标记输出）；`.test-tmp` 与 `*.key` 已 gitignore。
